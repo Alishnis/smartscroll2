@@ -1,0 +1,231 @@
+/* =========================================
+   Design System — Linear / Modern
+   Ambient, precise, cinematic
+   ========================================= */
+
+/* ── Fonts ── */
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('/assets/fontfaces/SF-Pro-Display-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('/assets/fontfaces/SF-Pro-Display-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('/assets/fontfaces/SF-Pro-Display-Semibold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* ── Color Strategy: Deep Space with Ambient Light ── */
+  --color-bg-deep: #000000;
+  /* Absolute darkest */
+  --color-bg-base: #000000;
+  /* Primary page canvas */
+  --color-bg-elevated: #111111;
+  /* Elevated surfaces */
+
+  --color-surface: rgba(255, 255, 255, 0.05);
+  /* Card backgrounds */
+  --color-surface-hover: rgba(255, 255, 255, 0.08);
+  /* Hovered card state */
+
+  --color-nav-bg: rgba(10, 10, 12, 0.65);
+  --color-nav-bg-hover: rgba(10, 10, 12, 0.85);
+
+  --color-header-bg: rgba(5, 5, 6, 0.65);
+  --color-header-bg-hover: rgba(5, 5, 6, 0.85);
+
+  --color-text-primary: #EDEDEF;
+  /* Primary text — bright but not pure white */
+  --color-text-muted: #8A8F98;
+  /* Body text, descriptions */
+  --color-text-subtle: rgba(255, 255, 255, 0.60);
+  /* Tertiary text */
+
+  --color-accent: #30CAA1;
+  /* Primary interactive color */
+  --color-accent-bright: #44E6BE;
+  /* Hover state for accent */
+  --color-accent-glow: rgba(48, 202, 161, 0.3);
+  /* Glow effects */
+
+  --color-border-default: rgba(255, 255, 255, 0.25);
+  --color-border-hover: rgba(255, 255, 255, 0.25);
+  --color-border-accent: rgba(48, 202, 161, 0.40);
+
+  /* ── Spacing (8px Grid System) ── */
+  --space-0: 0px;
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 40px;
+  --space-6: 48px;
+  --space-7: 56px;
+  --space-8: 64px;
+
+  /* ── Radii System ── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  /* Specifically 16px for cards */
+  --radius-full: 9999px;
+
+  /* ── Multi-Layer Shadows ── */
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 2px 20px rgba(0, 0, 0, 0.4), 0 0 40px rgba(0, 0, 0, 0.2);
+  --shadow-card-hover: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 8px 40px rgba(0, 0, 0, 0.5), 0 0 80px rgba(48, 202, 161, 0.1);
+  --shadow-accent: 0 0 0 1px rgba(48, 202, 161, 0.5), 0 4px 12px rgba(48, 202, 161, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  --shadow-inner-light: inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  --shadow-dropdown: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 8px 32px rgba(0, 0, 0, 0.6);
+
+  /* ── Typography & Easing ── */
+  --font-family-base: "Inter", "Geist Sans", "SF Pro Display", system-ui, sans-serif;
+  --font-family-tech: "Inter", "Geist Sans", "SF Pro Display", system-ui, sans-serif;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-fast: 200ms var(--ease-out-expo);
+  --transition-normal: 300ms var(--ease-out-expo);
+}
+
+[data-theme='light'] {
+  --color-bg-deep: #f0f2f5;
+  --color-bg-base: #ffffff;
+  --color-bg-elevated: #ffffff;
+
+  --color-surface: rgba(0, 0, 0, 0.03);
+  --color-surface-hover: rgba(0, 0, 0, 0.06);
+
+  --color-nav-bg: rgba(255, 255, 255, 0.75);
+  --color-nav-bg-hover: rgba(255, 255, 255, 0.95);
+
+  --color-header-bg: rgba(245, 245, 247, 0.75);
+  --color-header-bg-hover: rgba(245, 245, 247, 0.95);
+
+  --color-text-primary: #111827;
+  --color-text-muted: #4b5563;
+  --color-text-subtle: rgba(0, 0, 0, 0.60);
+
+  --color-accent: #30CAA1;
+  --color-accent-bright: #29b48e;
+  --color-accent-glow: rgba(48, 202, 161, 0.2);
+
+  --color-border-default: rgba(0, 0, 0, 0.1);
+  --color-border-hover: rgba(0, 0, 0, 0.2);
+  --color-border-accent: rgba(48, 202, 161, 0.40);
+
+  --shadow-card: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 2px 10px rgba(0, 0, 0, 0.05), 0 0 20px rgba(0, 0, 0, 0.02);
+  --shadow-card-hover: 0 0 0 1px rgba(0, 0, 0, 0.1), 0 8px 30px rgba(0, 0, 0, 0.08), 0 0 40px rgba(48, 202, 161, 0.1);
+  --shadow-dropdown: 0 0 0 1px rgba(0, 0, 0, 0.1), 0 8px 24px rgba(0, 0, 0, 0.1);
+  --shadow-inner-light: inset 0 1px 0 0 rgba(0, 0, 0, 0.05);
+}
+
+/* ── Reset ── */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-base);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+  color: inherit;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: var(--space-1);
+  height: var(--space-1);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-deep);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-hover);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-hover);
+}
+
+/* ── Global Typography Utilities ── */
+.text-gradient {
+  background: linear-gradient(to bottom, #ffffff, rgba(255, 255, 255, 0.7));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+[data-theme='light'] .text-gradient {
+  background: linear-gradient(to bottom, #111827, rgba(17, 24, 39, 0.7));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-accent {
+  background: linear-gradient(to right, #30CAA1, #6AF5CC, #30CAA1);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shine 4s linear infinite;
+}
+
+@keyframes shine {
+  to {
+    background-position: 200% center;
+  }
+}
+
+/* ── Glassmorphism (Utility) ── */
+.glass {
+  background: var(--color-surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--color-border-default);
+}

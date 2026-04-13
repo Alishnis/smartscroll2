@@ -1,0 +1,352 @@
+/* =========================================
+   Feed Page — Pixel-perfect 8px grid
+   ========================================= */
+
+/* ── Page Shell ── */
+.page-container {
+    padding: var(--space-4);
+    /* 32px */
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+.feed-page {
+    max-width: 1200px;
+}
+
+.page-header {
+    margin-bottom: var(--space-4);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.feed-search-form {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-icon {
+    position: absolute;
+    left: 14px;
+    color: var(--color-text-muted);
+}
+
+.feed-search-input {
+    width: 250px;
+    height: 40px;
+    padding: 0 16px 0 42px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-full);
+    color: var(--color-text-primary);
+    font-size: 14px;
+    font-family: var(--font-family-base);
+    transition: all var(--transition-normal);
+}
+
+.feed-search-input:hover {
+    border-color: var(--color-border-hover);
+}
+
+.feed-search-input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(48, 202, 161, 0.15);
+    /* Using the accent color roughly */
+}
+
+.feed-search-input::placeholder {
+    color: var(--color-text-muted);
+}
+
+.feed-search-btn {
+    height: 40px;
+    padding: 0 20px;
+    background: var(--color-accent);
+    color: var(--color-bg-base);
+    border: none;
+    border-radius: var(--radius-full);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.feed-search-btn:hover {
+    background: var(--color-accent-bright);
+    transform: translateY(-1px);
+}
+
+@media (max-width: 600px) {
+    .feed-search-form {
+        width: 100%;
+    }
+
+    .search-input-wrapper {
+        flex: 1;
+    }
+
+    .feed-search-input {
+        width: 100%;
+    }
+}
+
+.tech-font {
+    font-family: var(--font-family-tech);
+    font-weight: 700;
+    font-size: 28px;
+    line-height: 36px;
+    color: var(--color-text-primary);
+    letter-spacing: -0.02em;
+}
+
+.subtitle {
+    color: var(--color-text-muted);
+    font-size: 14px;
+    margin-top: var(--space-1);
+    /* 8px */
+}
+
+/* ── Feed Content — 3-column grid ── */
+.feed-content {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-3);
+    /* 24px */
+}
+
+@media (max-width: 900px) {
+    .feed-content {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 560px) {
+    .feed-content {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Video Card (fixed height) ── */
+.video-card-wrapper {
+    position: relative;
+}
+
+.video-card-wrapper.menu-open {
+    z-index: 100;
+}
+
+.video-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    cursor: pointer;
+}
+
+/* ── Thumbnail ── */
+.video-thumb {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--color-bg-elevated);
+    flex-shrink: 0;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    overflow: hidden;
+    position: relative;
+}
+
+.video-thumb::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.4), transparent 40%);
+}
+
+/* ── Meta Info (below thumbnail) ── */
+.video-meta {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+    position: relative;
+    z-index: 2;
+}
+
+/* Title — exactly 2 lines, clamp with ellipsis */
+.video-title {
+    font-family: var(--font-family-tech);
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 22px;
+    max-height: 44px;
+    color: var(--color-text-primary);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+}
+
+/* Channel name */
+.video-channel {
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--color-text-muted);
+    margin: 0 0 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Stats row: likes · views ···  [three-dot] */
+.video-stats-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: auto;
+}
+
+.video-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Three-dot menu ── */
+.video-more-wrap {
+    position: relative;
+    margin-left: auto;
+    z-index: 50;
+}
+
+.video-more-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted);
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.video-more-btn:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text-primary);
+}
+
+/* Dropdown */
+.video-dropdown {
+    position: absolute;
+    right: 0;
+    top: 32px;
+    min-width: 160px;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-dropdown);
+    z-index: 50;
+    padding: 6px;
+    animation: dropdown-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transform-origin: top right;
+}
+
+@keyframes dropdown-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.dropdown-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    transition: background var(--transition-fast), color var(--transition-fast);
+    text-align: left;
+}
+
+.dropdown-item:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text-primary);
+}
+
+/* ── Legacy — kept for other pages ── */
+.text-secondary {
+    color: var(--color-text-muted);
+    font-size: 13px;
+    line-height: 20px;
+    margin-bottom: var(--space-1);
+}
+
+/* ── Video Player Split Screen ── */
+.video-player-container {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: var(--space-3);
+    /* 24px */
+    height: calc(100vh - 200px);
+    /* Fill remaining vertical space but not completely to the bottom bar */
+    min-height: 500px;
+}
+
+@media (max-width: 900px) {
+    .video-player-container {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+
+    .video-section {
+        height: 50vh;
+        min-height: 300px;
+    }
+
+    .notes-section {
+        height: 400px;
+    }
+}
+
+.video-section {
+    position: relative;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+}
+
+.video-player-card {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+.notes-section {
+    position: relative;
+    height: 100%;
+}

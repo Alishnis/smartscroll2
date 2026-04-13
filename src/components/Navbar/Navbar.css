@@ -1,0 +1,132 @@
+/* =========================================
+   Bottom Navbar — Pixel-perfect 8px grid
+   ========================================= */
+
+.navbar-container {
+    position: fixed;
+    bottom: var(--space-4);
+    /* 32px */
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.navbar {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    /* 24px */
+    padding: var(--space-2) var(--space-4);
+    /* 16px 32px */
+    border-radius: var(--radius-full);
+    background-color: var(--color-nav-bg);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--color-border-default);
+    box-shadow: var(--shadow-card);
+    transition: transform var(--transition-normal), box-shadow var(--transition-normal), border var(--transition-normal), background var(--transition-normal);
+}
+
+.navbar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    box-shadow: var(--shadow-inner-light);
+}
+
+.navbar:hover {
+    transform: translateY(-4px);
+    background-color: var(--color-nav-bg-hover);
+    box-shadow: var(--shadow-card-hover);
+    border-color: var(--color-border-hover);
+}
+
+/* ── Nav Item (icon wrapper) ── */
+.nav-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-full);
+    background-color: transparent;
+    color: var(--color-text-muted);
+    transition: all var(--transition-fast);
+}
+
+.nav-item:hover {
+    color: var(--color-text-primary);
+    background-color: var(--color-surface);
+}
+
+/* ── Active state ── */
+.nav-item.active {
+    background-color: var(--color-accent);
+    color: #ffffff;
+    box-shadow: var(--shadow-accent);
+}
+
+/* ── Feed (Primary CTA glow when active) ── */
+.nav-item.glow-icon.active {
+    background-color: var(--color-accent);
+    color: #ffffff;
+    box-shadow: var(--shadow-accent);
+}
+
+/* ── Posts (blue pill variant) ── */
+.nav-item.nav-blue {
+    color: var(--color-text-muted);
+}
+
+.nav-item.nav-blue:hover {
+    color: var(--color-text-primary);
+}
+
+.nav-item.nav-blue.active {
+    background-color: var(--color-accent);
+    color: #ffffff;
+    border: 1px solid transparent;
+    /* Override any previously specific active borders */
+    box-shadow: var(--shadow-accent);
+}
+
+/* ── Auth buttons ── */
+.auth-btn {
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    margin-left: var(--space-2);
+    /* 16px */
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all var(--transition-fast);
+}
+
+.login-btn {
+    background-color: var(--color-surface);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border-default);
+    box-shadow: var(--shadow-inner-light);
+}
+
+.login-btn:hover {
+    background-color: var(--color-surface-hover);
+    border-color: var(--color-border-hover);
+}
+
+.logout-btn {
+    background-color: transparent;
+    color: var(--color-text-muted);
+    border: 1px solid transparent;
+}
+
+.logout-btn:hover {
+    color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.1);
+}

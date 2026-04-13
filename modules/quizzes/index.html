@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Квизы - Образовательная платформа</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧠 Квизы</h1>
+            <p>Образовательная платформа с викторинами</p>
+        </header>
+
+        <main>
+            <div id="category-selection" class="section">
+                <h2>Выберите категорию</h2>
+                
+                <div class="search-container">
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="Поиск по темам..." autocomplete="off">
+                        <div class="search-icon">🔍</div>
+                    </div>
+                    <div id="search-suggestions" class="search-suggestions hidden">
+                        <!-- Предложения будут загружены динамически -->
+                    </div>
+                </div>
+                
+                <div class="filter-tags" id="filter-tags">
+                    <!-- Теги для быстрого фильтра будут загружены динамически -->
+                </div>
+                
+                <!-- Выбор количества вопросов -->
+                <div class="questions-count-selector">
+                    <label for="questions-count">Количество вопросов:</label>
+                    <select id="questions-count">
+                        <option value="10">10 вопросов</option>
+                        <option value="20">20 вопросов</option>
+                        <option value="30">30 вопросов</option>
+                        <option value="50" selected>50 вопросов</option>
+                        <option value="100">100 вопросов</option>
+                    </select>
+                </div>
+                
+                <div class="categories-grid" id="categories-grid">
+                    <!-- Категории будут загружены динамически -->
+                </div>
+            </div>
+
+            <div id="quiz-section" class="section hidden">
+                <div class="quiz-header">
+                    <h2 id="quiz-title">Квиз</h2>
+                    <div class="quiz-progress">
+                        <span id="current-question">1</span> / <span id="total-questions">10</span>
+                    </div>
+                </div>
+
+                <div class="question-container">
+                    <h3 id="question-text">Вопрос</h3>
+                    <div class="answers" id="answers-container">
+                        <!-- Варианты ответов будут загружены динамически -->
+                    </div>
+                </div>
+
+                <div class="quiz-controls">
+                    <button id="prev-question" class="btn btn-secondary hidden">← Предыдущий</button>
+                    <button id="next-question" class="btn btn-primary hidden">Следующий →</button>
+                    <button id="finish-quiz" class="btn btn-success hidden">Завершить квиз</button>
+                </div>
+
+                <!-- Навигация по вопросам -->
+                <div class="question-navigation">
+                    <div class="nav-header">
+                        <h4>Навигация по вопросам</h4>
+                        <div class="nav-legend">
+                            <div class="legend-item">
+                                <span class="legend-dot correct"></span>
+                                <span>Правильно</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-dot incorrect"></span>
+                                <span>Неправильно</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-dot answered"></span>
+                                <span>Отвечено</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-dot current"></span>
+                                <span>Текущий</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="questions-grid" id="questions-grid">
+                        <!-- Кнопки вопросов будут загружены динамически -->
+                    </div>
+                </div>
+            </div>
+
+            <div id="results-section" class="section hidden">
+                <h2>Результаты</h2>
+                <div class="score-display">
+                    <div class="score-circle">
+                        <span id="score-percentage">0%</span>
+                    </div>
+                    <p>Правильных ответов: <span id="correct-answers">0</span> из <span id="total-answers">0</span></p>
+                </div>
+                <div class="results-actions">
+                    <button id="restart-quiz" class="btn btn-primary">Начать заново</button>
+                    <button id="choose-category" class="btn btn-secondary">Выбрать другую категорию</button>
+                    <button id="review-errors" class="btn btn-warning hidden">Посмотреть ошибки</button>
+                </div>
+            </div>
+
+            <div id="review-section" class="section hidden">
+                <div class="review-header">
+                    <h2>Разбор ошибок</h2>
+                    <button id="back-to-results" class="btn btn-secondary">← Назад к результатам</button>
+                </div>
+                
+                <div class="review-stats">
+                    <div class="stat-item">
+                        <span class="stat-number" id="total-questions-review">0</span>
+                        <span class="stat-label">Всего вопросов</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="correct-answers-review">0</span>
+                        <span class="stat-label">Правильных</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="incorrect-answers-review">0</span>
+                        <span class="stat-label">Неправильных</span>
+                    </div>
+                </div>
+
+                <div class="review-content">
+                    <div id="all-questions-review" class="review-tab active">
+                        <h3>Все вопросы</h3>
+                        <div id="all-questions-list" class="questions-list">
+                            <!-- Все вопросы будут загружены динамически -->
+                        </div>
+                    </div>
+                    
+                    <div id="incorrect-questions-review" class="review-tab">
+                        <h3>Неправильные ответы</h3>
+                        <div id="incorrect-questions-list" class="questions-list">
+                            <!-- Неправильные ответы будут загружены динамически -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="review-tabs">
+                    <button class="tab-btn active" data-tab="all-questions-review">Все вопросы</button>
+                    <button class="tab-btn" data-tab="incorrect-questions-review">Только ошибки</button>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>© 2024 Образовательная платформа. Данные из OpenTriviaQA</p>
+        </footer>
+    </div>
+
+    <script src="quiz-data-extended.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
