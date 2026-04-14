@@ -8,19 +8,49 @@ export const AuthProvider = ({ children }) => {
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    const ensureProfile = async (currentUser) => {
+        if (!currentUser?.id) return;
+
+        const username =
+            currentUser.user_metadata?.username ||
+            currentUser.email?.split('@')[0] ||
+            'Learner';
+
+        const { error } = await supabase
+            .from('profiles')
+            .upsert([{
+                id: currentUser.id,
+                username,
+                role: 'Knowledge Explorer',
+                updated_at: new Date().toISOString()
+            }], {
+                onConflict: 'id'
+            });
+
+        if (error) {
+            console.error('Error ensuring profile:', error.message);
+        }
+    };
+
     useEffect(() => {
         // Get the initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
             setSession(session);
             setUser(session?.user ?? null);
+            if (session?.user) {
+                await ensureProfile(session.user);
+            }
             setLoading(false);
         });
 
         // Listen for auth state changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            (_event, session) => {
+            async (_event, session) => {
                 setSession(session);
                 setUser(session?.user ?? null);
+                if (session?.user) {
+                    await ensureProfile(session.user);
+                }
                 setLoading(false);
             }
         );
@@ -47,10 +77,15 @@ export const AuthProvider = ({ children }) => {
         return { error };
     };
 
-    const signUpWithEmail = async (email, password) => {
+    const signUpWithEmail = async (email, password, username = '') => {
         const { error } = await supabase.auth.signUp({
             email,
             password,
+            options: {
+                data: {
+                    username: username || email.split('@')[0]
+                }
+            }
         });
         if (error) console.error('Error signing up:', error.message);
         return { error };

@@ -31,6 +31,10 @@
     margin-bottom: var(--space-6);
 }
 
+.stat-card--coins {
+    background: linear-gradient(135deg, rgba(255, 191, 95, 0.12), rgba(255, 191, 95, 0.03));
+}
+
 .stat-card {
     padding: var(--space-3);
     border-radius: var(--radius-xl);
@@ -72,6 +76,77 @@
     font-size: 20px;
     font-weight: 600;
     letter-spacing: -0.01em;
+}
+
+.profile-shop {
+    margin-bottom: var(--space-6);
+}
+
+.shop-balance {
+    color: var(--color-text-muted);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.shop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-3);
+}
+
+.shop-card {
+    overflow: hidden;
+}
+
+.shop-card__swatch {
+    height: 82px;
+    background:
+        radial-gradient(circle at 25% 20%, color-mix(in srgb, var(--swatch-color) 76%, white), transparent 35%),
+        linear-gradient(135deg, color-mix(in srgb, var(--swatch-color) 24%, #101521), #101521 64%);
+    border-bottom: 1px solid var(--color-border-default);
+}
+
+.shop-card__body {
+    padding: var(--space-3);
+    display: grid;
+    gap: 14px;
+}
+
+.shop-card__body h4 {
+    font-family: var(--font-family-tech);
+    font-size: 16px;
+    margin-bottom: 6px;
+}
+
+.shop-card__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.shop-price {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #ffbf5f;
+    font-weight: 700;
+}
+
+.shop-action-btn {
+    min-height: 38px;
+    padding: 0 14px;
+    border-radius: 999px;
+    background: rgba(93, 135, 255, 0.12);
+    border: 1px solid rgba(93, 135, 255, 0.22);
+    color: #9ce7ff;
+    font-weight: 600;
+}
+
+.shop-action-btn.is-equipped {
+    background: rgba(48, 202, 161, 0.12);
+    border-color: rgba(48, 202, 161, 0.22);
+    color: #8cf7e3;
 }
 
 .view-all-btn {

@@ -2,31 +2,79 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import * as LucideIcons from 'lucide-react';
 import SpotlightCard from '../../components/SpotlightCard/SpotlightCard';
-import { fetchUserProfile, fetchUserSummaries } from '../../lib/db';
+import { useAuth } from '../../context/AuthContext';
+import {
+    equipProfileAccessory,
+    fetchGamificationProfile,
+    fetchUserAccessoryPurchases,
+    fetchUserProfile,
+    fetchUserSummaries,
+    purchaseProfileAccessory
+} from '../../lib/db';
+import { ACCESSORY_CATALOG } from '../../lib/accessories';
 import { useLanguage } from '../../context/LanguageContext';
 import { translations } from '../../i18n/translations';
 import './Profile.css';
 
+const FALLBACK_USER_ID = '00000000-0000-0000-0000-000000000001';
+
 const Profile = () => {
+    const { user } = useAuth();
+    const userId = user?.id || FALLBACK_USER_ID;
     const { language } = useLanguage();
     const t = translations[language].profile;
     const [profile, setProfile] = useState(null);
+    const [gamification, setGamification] = useState(null);
+    const [purchases, setPurchases] = useState([]);
     const [summaries, setSummaries] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [busyAccessoryId, setBusyAccessoryId] = useState(null);
+
+    const loadProfileData = async () => {
+        setLoading(true);
+        const [profileData, summariesData, gamificationData, purchasesData] = await Promise.all([
+            fetchUserProfile(userId),
+            fetchUserSummaries(userId),
+            fetchGamificationProfile(userId),
+            fetchUserAccessoryPurchases(userId)
+        ]);
+        setProfile(profileData);
+        setSummaries(summariesData);
+        setGamification(gamificationData);
+        setPurchases(purchasesData);
+        setLoading(false);
+    };
 
     useEffect(() => {
-        const loadProfileData = async () => {
-            setLoading(true);
-            const [profileData, summariesData] = await Promise.all([
-                fetchUserProfile(),
-                fetchUserSummaries()
-            ]);
-            setProfile(profileData);
-            setSummaries(summariesData);
-            setLoading(false);
-        };
         loadProfileData();
-    }, []);
+    }, [userId]);
+
+    const ownedAccessoryIds = new Set(purchases.map((item) => item.accessory_id));
+    const equippedAccessory = ACCESSORY_CATALOG.find(
+        (item) => item.id === gamification?.equipped_accessory_id
+    );
+
+    const handleAccessoryAction = async (accessory) => {
+        setBusyAccessoryId(accessory.id);
+
+        if (ownedAccessoryIds.has(accessory.id)) {
+            await equipProfileAccessory({
+                userId,
+                accessoryId: accessory.id
+            });
+        } else {
+            await purchaseProfileAccessory({
+                userId,
+                accessoryId: accessory.id,
+                price: accessory.price,
+                title: accessory.title,
+                category: accessory.category
+            });
+        }
+
+        await loadProfileData();
+        setBusyAccessoryId(null);
+    };
 
     if (loading) {
         return (
@@ -85,6 +133,13 @@ const Profile = () => {
             </header>
 
             <div className="stats-grid">
+                <SpotlightCard className="stat-card stat-card--coins">
+                    <div className="stat-icon" style={{ color: '#ffbf5f' }}><LucideIcons.Coins size={20} /></div>
+                    <div className="stat-content">
+                        <h3>{gamification?.smart_coins || 0}</h3>
+                        <p className="text-secondary">{t.smart_coins}</p>
+                    </div>
+                </SpotlightCard>
                 <SpotlightCard className="stat-card">
                     <div className="stat-icon"><LucideIcons.BookOpen size={20} className="accent-color" style={{ color: '#5E6AD2' }} /></div>
                     <div className="stat-content">
@@ -106,6 +161,61 @@ const Profile = () => {
                         <p className="text-secondary">{t.active_streaks}</p>
                     </div>
                 </SpotlightCard>
+                <SpotlightCard className="stat-card">
+                    <div className="stat-icon" style={{ color: equippedAccessory?.color || '#79ffe1' }}>
+                        <LucideIcons.Sparkles size={20} />
+                    </div>
+                    <div className="stat-content">
+                        <h3>{equippedAccessory?.title || t.no_accessory}</h3>
+                        <p className="text-secondary">{t.equipped_accessory}</p>
+                    </div>
+                </SpotlightCard>
+            </div>
+
+            <div className="profile-shop">
+                <div className="section-header">
+                    <h2>{t.accessory_shop}</h2>
+                    <span className="shop-balance">{t.balance_label}: {gamification?.smart_coins || 0}</span>
+                </div>
+
+                <div className="shop-grid">
+                    {ACCESSORY_CATALOG.map((accessory) => {
+                        const isOwned = ownedAccessoryIds.has(accessory.id);
+                        const isEquipped = gamification?.equipped_accessory_id === accessory.id;
+                        const isBusy = busyAccessoryId === accessory.id;
+
+                        return (
+                            <SpotlightCard key={accessory.id} className="shop-card">
+                                <div className="shop-card__swatch" style={{ '--swatch-color': accessory.color }} />
+                                <div className="shop-card__body">
+                                    <div>
+                                        <h4>{accessory.title}</h4>
+                                        <p className="text-secondary">{accessory.description}</p>
+                                    </div>
+                                    <div className="shop-card__footer">
+                                        <span className="shop-price">
+                                            <LucideIcons.Coins size={14} />
+                                            {accessory.price}
+                                        </span>
+                                        <button
+                                            className={`shop-action-btn${isEquipped ? ' is-equipped' : ''}`}
+                                            disabled={isBusy}
+                                            onClick={() => handleAccessoryAction(accessory)}
+                                        >
+                                            {isBusy
+                                                ? t.processing
+                                                : isEquipped
+                                                    ? t.equipped
+                                                    : isOwned
+                                                        ? t.equip
+                                                        : t.buy}
+                                        </button>
+                                    </div>
+                                </div>
+                            </SpotlightCard>
+                        );
+                    })}
+                </div>
             </div>
 
             <div className="saved-summaries">

@@ -1,12 +1,47 @@
 import React, { useEffect, useState } from 'react';
-import { X, MessageSquare, ArrowUp, ArrowDown } from 'lucide-react';
+import { X, MessageSquare, ArrowUp, ArrowDown, Brain } from 'lucide-react';
 import { fetchRedditPostComments } from '../../lib/api';
 import Skeleton from '../Skeleton/Skeleton';
 import './PostModal.css';
 
-const PostModal = ({ post, onClose }) => {
+const decodeHtml = (value) => value ? value.replace(/&amp;/g, '&') : value;
+const isImageUrl = (value) => typeof value === 'string' && /\.(jpe?g|png|gif|webp)$/i.test(value);
+
+const getPostImage = (post) => {
+    if (!post) return null;
+
+    if (post.preview?.images?.length) {
+        const source = post.preview.images[0].source?.url;
+        if (source) return decodeHtml(source);
+    }
+
+    if (post.is_gallery && post.media_metadata) {
+        const firstKey = Object.keys(post.media_metadata)[0];
+        const media = post.media_metadata[firstKey];
+        const url = media?.s?.u || media?.p?.[media.p.length - 1]?.u;
+        if (url) return decodeHtml(url);
+    }
+
+    if (post.post_hint === 'image' && post.url) {
+        return decodeHtml(post.url);
+    }
+
+    const fallbackUrl = post.url_overridden_by_dest || post.url;
+    if (isImageUrl(fallbackUrl)) {
+        return decodeHtml(fallbackUrl);
+    }
+
+    if (post.thumbnail && post.thumbnail.startsWith('http')) {
+        return decodeHtml(post.thumbnail);
+    }
+
+    return null;
+};
+
+const PostModal = ({ post, onClose, onExplainBack }) => {
     const [comments, setComments] = useState([]);
     const [loading, setLoading] = useState(true);
+    const imageUrl = getPostImage(post);
 
     useEffect(() => {
         const loadComments = async () => {
@@ -55,6 +90,12 @@ const PostModal = ({ post, onClose }) => {
                 <div className="post-modal-body custom-scrollbar">
                     <h2 className="post-title" dangerouslySetInnerHTML={{ __html: post.title }} style={{ marginBottom: '12px' }}></h2>
 
+                    {imageUrl && (
+                        <div className="post-modal-image-wrap">
+                            <img src={imageUrl} alt={post.title} className="post-modal-image" />
+                        </div>
+                    )}
+
                     {post.selftext && (
                         <div className="post-full-text">
                             {post.selftext}
@@ -64,6 +105,12 @@ const PostModal = ({ post, onClose }) => {
                     <div className="post-actions" style={{ marginTop: '16px', marginBottom: '24px' }}>
                         <span className="action-btn icon-only" style={{ cursor: 'default', paddingLeft: 0 }}><ArrowUp size={16} /> {post.score >= 1000 ? (post.score / 1000).toFixed(1) + 'k' : post.score} <ArrowDown size={16} /></span>
                         <span className="action-btn" style={{ cursor: 'default' }}><MessageSquare size={16} /> {post.num_comments} Comments</span>
+                        {onExplainBack && (
+                            <button className="action-btn post-modal-explain-btn" onClick={() => onExplainBack(post)}>
+                                <Brain size={16} />
+                                Explain Back
+                            </button>
+                        )}
                     </div>
 
                     <div className="comments-section">

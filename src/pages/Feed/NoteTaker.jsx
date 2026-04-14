@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Cloud, CloudUpload, CloudOff } from 'lucide-react';
 import { fetchVideoNote, upsertVideoNote, saveUserSummary } from '../../lib/db';
+import { useAuth } from '../../context/AuthContext';
 import './NoteTaker.css';
 
-// We use 00000000-0000-0000-0000-000000000001 as the mock user for now
-const MOCK_USER_ID = '00000000-0000-0000-0000-000000000001';
+const FALLBACK_USER_ID = '00000000-0000-0000-0000-000000000001';
 const GLOBAL_FEED_NOTES_ID = 'global-feed-notes';
 
 const NoteTaker = () => {
+    const { user } = useAuth();
+    const userId = user?.id || FALLBACK_USER_ID;
     const [notes, setNotes] = useState('');
     const [saveStatus, setSaveStatus] = useState('saved'); // 'saved', 'saving', 'error', 'loading'
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -18,7 +20,7 @@ const NoteTaker = () => {
     useEffect(() => {
         const loadNotes = async () => {
             setSaveStatus('loading');
-            const data = await fetchVideoNote(MOCK_USER_ID, GLOBAL_FEED_NOTES_ID);
+            const data = await fetchVideoNote(userId, GLOBAL_FEED_NOTES_ID);
             setNotes(data || '');
             setSaveStatus('saved');
         };
@@ -29,7 +31,7 @@ const NoteTaker = () => {
         return () => {
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         };
-    }, []);
+    }, [userId]);
 
     // Handle text change with debounce auto-save
     const handleChange = (e) => {
@@ -44,7 +46,7 @@ const NoteTaker = () => {
 
         // Set new debounced timeout (wait 1 second after last keystroke)
         typingTimeoutRef.current = setTimeout(async () => {
-            const success = await upsertVideoNote(MOCK_USER_ID, GLOBAL_FEED_NOTES_ID, newNotes);
+            const success = await upsertVideoNote(userId, GLOBAL_FEED_NOTES_ID, newNotes);
             if (success) {
                 setSaveStatus('saved');
             } else {
@@ -61,7 +63,7 @@ const NoteTaker = () => {
     const confirmSave = async () => {
         if (noteTitle.trim()) {
             setSaveStatus('saving');
-            const success = await saveUserSummary(MOCK_USER_ID, noteTitle, notes, 'Book');
+            const success = await saveUserSummary(userId, noteTitle, notes, 'Book');
             if (success) {
                 setSaveStatus('saved');
                 alert(`Note "${noteTitle}" saved to your profile!`);

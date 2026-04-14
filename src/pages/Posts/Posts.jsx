@@ -1,15 +1,53 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowUp, ArrowDown, MessageSquare, Share2, MoreHorizontal, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowUp, ArrowDown, MessageSquare, Share2, MoreHorizontal, SlidersHorizontal, X, Brain } from 'lucide-react';
 import { fetchRedditPosts } from '../../lib/api';
 import { REDDIT_CATEGORIES } from '../../lib/redditCategories';
 import Skeleton from '../../components/Skeleton/Skeleton';
 import SpotlightCard from '../../components/SpotlightCard/SpotlightCard';
 import PostModal from '../../components/PostModal/PostModal';
+import ExplainBackModal from '../../components/ExplainBackModal/ExplainBackModal';
+import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { translations } from '../../i18n/translations';
 import './Posts.css';
 
+const decodeHtml = (value) => value ? value.replace(/&amp;/g, '&') : value;
+const isImageUrl = (value) => typeof value === 'string' && /\.(jpe?g|png|gif|webp)$/i.test(value);
+
+const getPostImage = (post) => {
+    if (!post) return null;
+
+    if (post.preview?.images?.length) {
+        const source = post.preview.images[0].source?.url;
+        if (source) return decodeHtml(source);
+    }
+
+    if (post.is_gallery && post.media_metadata) {
+        const firstKey = Object.keys(post.media_metadata)[0];
+        const media = post.media_metadata[firstKey];
+        const url = media?.s?.u || media?.p?.[media.p.length - 1]?.u;
+        if (url) return decodeHtml(url);
+    }
+
+    if (post.post_hint === 'image' && post.url) {
+        return decodeHtml(post.url);
+    }
+
+    const fallbackUrl = post.url_overridden_by_dest || post.url;
+    if (isImageUrl(fallbackUrl)) {
+        return decodeHtml(fallbackUrl);
+    }
+
+    if (post.thumbnail && post.thumbnail.startsWith('http')) {
+        return decodeHtml(post.thumbnail);
+    }
+
+    return null;
+};
+
 const Posts = () => {
+    const { user } = useAuth();
+    const userId = user?.id || '00000000-0000-0000-0000-000000000001';
     const { language } = useLanguage();
     const t = translations[language].posts;
     const [posts, setPosts] = useState([]);
@@ -18,6 +56,7 @@ const Posts = () => {
     const [selectedPost, setSelectedPost] = useState(null);
     const [includeImages, setIncludeImages] = useState(true);
     const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+    const [explainPost, setExplainPost] = useState(null);
 
     useEffect(() => {
         const getPosts = async () => {
@@ -83,6 +122,7 @@ const Posts = () => {
                         return !hasImage;
                     }).map((postWrapper) => {
                         const post = postWrapper.data;
+                        const imageUrl = getPostImage(post);
                         return (
                             <SpotlightCard
                                 key={post.id}
@@ -100,11 +140,25 @@ const Posts = () => {
                                         <span className="post-author">• {t.posted_by}{post.author}</span>
                                     </div>
                                     <h2 className="post-title" dangerouslySetInnerHTML={{ __html: post.title }}></h2>
+                                    {imageUrl && (
+                                        <div className="post-image-wrap">
+                                            <img src={imageUrl} alt={post.title} className="post-image" />
+                                        </div>
+                                    )}
                                     <p className="text-secondary">{post.selftext ? post.selftext.substring(0, 150) + '...' : t.link_post}</p>
 
                                     <div className="post-actions">
                                         <button className="action-btn"><MessageSquare size={16} /> {post.num_comments} {t.comments}</button>
                                         <button className="action-btn"><Share2 size={16} /> {t.share}</button>
+                                        <button
+                                            className="action-btn explain-action-btn"
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                setExplainPost(post);
+                                            }}
+                                        >
+                                            <Brain size={16} /> {t.explain_back}
+                                        </button>
                                         <button className="action-btn icon-only"><MoreHorizontal size={16} /></button>
                                     </div>
                                 </div>
@@ -118,8 +172,25 @@ const Posts = () => {
                 <PostModal
                     post={selectedPost}
                     onClose={() => setSelectedPost(null)}
+                    onExplainBack={(post) => setExplainPost(post)}
                 />
             )}
+
+            <ExplainBackModal
+                isOpen={Boolean(explainPost)}
+                onClose={() => setExplainPost(null)}
+                sourceLabel={t.explain_post_label}
+                initialTopic={explainPost?.title || ''}
+                initialSourceText={
+                    explainPost
+                        ? `${explainPost.title}\n\n${explainPost.selftext || ''}\n\nSubreddit: r/${explainPost.subreddit}`
+                        : ''
+                }
+                contentId={explainPost?.id || ''}
+                contentType="reddit"
+                sourceTitle={explainPost?.title || ''}
+                userId={userId}
+            />
 
             {isFilterMenuOpen && (
                 <div className="filter-menu-overlay" onClick={() => setIsFilterMenuOpen(false)}>
