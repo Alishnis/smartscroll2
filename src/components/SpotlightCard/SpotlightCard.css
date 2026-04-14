@@ -1,0 +1,41 @@
+/* =========================================
+   Spotlight Card Base
+   ========================================= */
+
+.spotlight-card {
+    position: relative;
+    border-radius: var(--radius-xl);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-default);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+    transition: background var(--transition-normal), border var(--transition-normal), box-shadow var(--transition-normal), transform var(--transition-fast);
+}
+
+.spotlight-card:hover {
+    background: var(--color-surface-hover);
+    border-color: var(--color-border-hover);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-4px);
+    /* Max 4px bounce */
+}
+
+/* Base inner highlight */
+.spotlight-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    box-shadow: var(--shadow-inner-light);
+}
+
+.spotlight-effect {
+    position: absolute;
+    inset: -1px;
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+    pointer-events: none;
+    z-index: 10;
+    border-radius: inherit;
+}

@@ -1,0 +1,139 @@
+.auth-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    background: rgba(2, 6, 14, 0.72);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.auth-modal-content {
+    width: min(460px, 100%);
+    border-radius: 28px;
+    background: #0d111b;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+    padding: 24px;
+    position: relative;
+}
+
+.auth-modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--color-text-muted);
+}
+
+.auth-modal-chip {
+    display: inline-flex;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: rgba(93, 135, 255, 0.1);
+    border: 1px solid rgba(93, 135, 255, 0.18);
+    color: #9ce7ff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.auth-modal-header h2 {
+    font-family: var(--font-family-tech);
+    font-size: 30px;
+    line-height: 1.05;
+    margin-bottom: 10px;
+}
+
+.auth-modal-header p {
+    color: var(--color-text-muted);
+}
+
+.auth-modal-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 20px 0 16px;
+}
+
+.auth-modal-tab,
+.auth-submit {
+    min-height: 44px;
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
+.auth-modal-tab {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--color-text-muted);
+}
+
+.auth-modal-tab.active {
+    color: var(--color-text-primary);
+    border-color: rgba(121, 255, 225, 0.2);
+    background: rgba(93, 135, 255, 0.1);
+}
+
+.auth-form {
+    display: grid;
+    gap: 14px;
+}
+
+.auth-field {
+    display: grid;
+    gap: 8px;
+}
+
+.auth-field span {
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.auth-field input {
+    width: 100%;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #141927;
+    color: var(--color-text-primary);
+    padding: 14px 16px;
+    font: inherit;
+    outline: none;
+}
+
+.auth-message {
+    padding: 12px 14px;
+    border-radius: 14px;
+    font-size: 14px;
+}
+
+.auth-message--error {
+    background: rgba(255, 92, 92, 0.12);
+    border: 1px solid rgba(255, 92, 92, 0.2);
+    color: #ffb7b7;
+}
+
+.auth-message--success {
+    background: rgba(48, 202, 161, 0.12);
+    border: 1px solid rgba(48, 202, 161, 0.2);
+    color: #8cf7e3;
+}
+
+.auth-submit {
+    width: 100%;
+    background: linear-gradient(135deg, #5d87ff, #79ffe1);
+    color: #051324;
+}
