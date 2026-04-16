@@ -115,3 +115,74 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+@media (max-width: 760px) {
+    .site-header {
+        position: fixed;
+        top: 10px;
+        left: 12px;
+        right: 12px;
+        width: auto;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        background: color-mix(in srgb, var(--color-header-bg) 88%, transparent);
+        box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+    }
+
+    .header-logo {
+        flex-shrink: 0;
+        gap: 10px;
+    }
+
+    .logo-img {
+        width: 28px;
+        height: 28px;
+    }
+
+    .logo-text {
+        font-size: 14px;
+        line-height: 1.05;
+    }
+
+    .header-nav {
+        flex: 1;
+        min-width: 0;
+        gap: 6px;
+        justify-content: flex-start;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 2px;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .header-nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .header-link {
+        flex-shrink: 0;
+        padding: 8px 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        white-space: nowrap;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid transparent;
+    }
+
+    .header-link.active {
+        border-color: rgba(255, 255, 255, 0.06);
+    }
+
+    .header-link--cta {
+        padding-inline: 14px;
+    }
+
+    .header-user-pill {
+        display: none;
+    }
+}

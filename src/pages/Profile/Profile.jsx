@@ -9,17 +9,20 @@ import {
     fetchUserAccessoryPurchases,
     fetchUserProfile,
     fetchUserSummaries,
+    fetchUserVideoNotes,
     purchaseProfileAccessory
 } from '../../lib/db';
 import { ACCESSORY_CATALOG } from '../../lib/accessories';
+import { fetchYouTubeVideosByIds } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { translations } from '../../i18n/translations';
 import './Profile.css';
 
 const FALLBACK_USER_ID = '00000000-0000-0000-0000-000000000001';
+const PAGE_TIMEOUT_MS = 1400;
 
 const Profile = () => {
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const userId = user?.id || FALLBACK_USER_ID;
     const { language } = useLanguage();
     const t = translations[language].profile;
@@ -27,27 +30,54 @@ const Profile = () => {
     const [gamification, setGamification] = useState(null);
     const [purchases, setPurchases] = useState([]);
     const [summaries, setSummaries] = useState([]);
+    const [writtenNotes, setWrittenNotes] = useState([]);
+    const [noteVideoMap, setNoteVideoMap] = useState({});
     const [loading, setLoading] = useState(true);
     const [busyAccessoryId, setBusyAccessoryId] = useState(null);
 
     const loadProfileData = async () => {
         setLoading(true);
-        const [profileData, summariesData, gamificationData, purchasesData] = await Promise.all([
-            fetchUserProfile(userId),
-            fetchUserSummaries(userId),
-            fetchGamificationProfile(userId),
-            fetchUserAccessoryPurchases(userId)
-        ]);
-        setProfile(profileData);
-        setSummaries(summariesData);
-        setGamification(gamificationData);
-        setPurchases(purchasesData);
-        setLoading(false);
+        try {
+            const withTimeout = (promise, fallback) => Promise.race([
+                promise,
+                new Promise((resolve) => {
+                    window.setTimeout(() => resolve(fallback), PAGE_TIMEOUT_MS);
+                })
+            ]);
+
+            const [profileData, summariesData, gamificationData, purchasesData, videoNotesData] = await Promise.all([
+                withTimeout(fetchUserProfile(userId), null),
+                withTimeout(fetchUserSummaries(userId), []),
+                withTimeout(fetchGamificationProfile(userId), null),
+                withTimeout(fetchUserAccessoryPurchases(userId), []),
+                withTimeout(fetchUserVideoNotes(userId), [])
+            ]);
+
+            setProfile(profileData);
+            setSummaries(summariesData);
+            setGamification(gamificationData);
+            setPurchases(purchasesData);
+            setWrittenNotes(videoNotesData);
+            setLoading(false);
+
+            const noteVideoIds = videoNotesData.map((note) => note.video_id).filter(Boolean);
+            const videoDetails = await withTimeout(fetchYouTubeVideosByIds(noteVideoIds), []);
+            const videoMap = Object.fromEntries(videoDetails.map((video) => [video.id.videoId, video]));
+            setNoteVideoMap(videoMap);
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
-        loadProfileData();
-    }, [userId]);
+        if (authLoading) {
+            return;
+        }
+        loadProfileData().catch((error) => {
+            console.error('Error loading profile page:', error);
+            setLoading(false);
+        });
+    }, [authLoading, userId]);
 
     const ownedAccessoryIds = new Set(purchases.map((item) => item.accessory_id));
     const equippedAccessory = ACCESSORY_CATALOG.find(
@@ -75,50 +105,6 @@ const Profile = () => {
         await loadProfileData();
         setBusyAccessoryId(null);
     };
-
-    if (loading) {
-        return (
-            <div className="page-container profile-page">
-                <header className="page-header profile-header">
-                    <div>
-                        <div className="skeleton title" style={{ width: '140px' }}></div>
-                        <div className="skeleton bar" style={{ width: '180px', marginTop: '8px' }}></div>
-                    </div>
-                    <div className="skeleton avatar" style={{ width: '40px', height: '40px' }}></div>
-                </header>
-
-                <div className="stats-grid">
-                    {Array.from({ length: 3 }).map((_, i) => (
-                        <div key={i} className="stat-card glass">
-                            <div className="skeleton avatar" style={{ width: '60px', height: '60px', borderRadius: '14px' }}></div>
-                            <div style={{ flex: 1 }}>
-                                <div className="skeleton bar" style={{ width: '50%', height: '24px', marginBottom: '6px' }}></div>
-                                <div className="skeleton bar-short" style={{ width: '70%' }}></div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                <div className="saved-summaries">
-                    <div className="section-header">
-                        <div className="skeleton bar" style={{ width: '180px', height: '20px' }}></div>
-                        <div className="skeleton bar" style={{ width: '60px' }}></div>
-                    </div>
-                    <div className="summary-list">
-                        {Array.from({ length: 2 }).map((_, i) => (
-                            <div key={i} className="summary-item glass">
-                                <div className="skeleton circle"></div>
-                                <div style={{ flex: 1 }}>
-                                    <div className="skeleton bar" style={{ width: '60%', marginBottom: '8px' }}></div>
-                                    <div className="skeleton bar-short"></div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="page-container profile-page">
@@ -225,7 +211,17 @@ const Profile = () => {
                 </div>
 
                 <div className="summary-list">
-                    {summaries.length === 0 ? (
+                    {loading && summaries.length === 0 ? (
+                        Array.from({ length: 2 }).map((_, i) => (
+                            <div key={i} className="summary-item glass">
+                                <div className="skeleton circle"></div>
+                                <div style={{ flex: 1 }}>
+                                    <div className="skeleton bar" style={{ width: '60%', marginBottom: '8px' }}></div>
+                                    <div className="skeleton bar-short"></div>
+                                </div>
+                            </div>
+                        ))
+                    ) : summaries.length === 0 ? (
                         <div className="text-secondary" style={{ padding: '24px 0' }}>{t.no_summaries}</div>
                     ) : (
                         summaries.map(summary => {
@@ -239,6 +235,44 @@ const Profile = () => {
                                     </div>
                                 </SpotlightCard>
                             )
+                        })
+                    )}
+                </div>
+            </div>
+
+            <div className="saved-summaries">
+                <div className="section-header">
+                    <h2>{t.written_notes}</h2>
+                </div>
+
+                <div className="summary-list">
+                    {loading && writtenNotes.length === 0 ? (
+                        Array.from({ length: 2 }).map((_, i) => (
+                            <div key={i} className="summary-item glass">
+                                <div className="skeleton circle"></div>
+                                <div style={{ flex: 1 }}>
+                                    <div className="skeleton bar" style={{ width: '60%', marginBottom: '8px' }}></div>
+                                    <div className="skeleton bar-short"></div>
+                                </div>
+                            </div>
+                        ))
+                    ) : writtenNotes.length === 0 ? (
+                        <div className="text-secondary" style={{ padding: '24px 0' }}>{t.no_written_notes}</div>
+                    ) : (
+                        writtenNotes.map((note) => {
+                            const linkedVideo = noteVideoMap[note.video_id];
+                            return (
+                                <SpotlightCard key={note.id || note.video_id} className="summary-item written-note-item">
+                                    <div className="summary-icon"><LucideIcons.NotebookPen size={16} /></div>
+                                    <div className="summary-info">
+                                        <h4>{linkedVideo?.snippet?.title || t.video_note_fallback}</h4>
+                                        <p className="text-secondary">{note.content}</p>
+                                        <Link className="written-note-link" to={`/feed?video=${note.video_id}`}>
+                                            {t.open_video_note}
+                                        </Link>
+                                    </div>
+                                </SpotlightCard>
+                            );
                         })
                     )}
                 </div>

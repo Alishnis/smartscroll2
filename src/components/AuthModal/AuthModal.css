@@ -114,6 +114,28 @@
     outline: none;
 }
 
+.auth-role-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.auth-role-option {
+    min-height: 46px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #141927;
+    color: var(--color-text-muted);
+    font-weight: 600;
+    transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.auth-role-option.is-active {
+    background: rgba(93, 135, 255, 0.14);
+    border-color: rgba(121, 255, 225, 0.24);
+    color: var(--color-text-primary);
+}
+
 .auth-message {
     padding: 12px 14px;
     border-radius: 14px;

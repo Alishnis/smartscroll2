@@ -1,0 +1,244 @@
+.shared-whiteboard {
+    min-height: auto;
+    gap: 18px;
+    display: grid;
+}
+
+.shared-whiteboard__header {
+    margin-bottom: 0;
+}
+
+.shared-whiteboard__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 0 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(225, 231, 239, 0.72);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.shared-whiteboard__spinner {
+    animation: whiteboardSpin 0.9s linear infinite;
+}
+
+.shared-whiteboard__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.shared-whiteboard__modes,
+.shared-whiteboard__controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.shared-whiteboard__mode,
+.shared-whiteboard__clear {
+    min-height: 42px;
+    padding: 0 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f6f8fc;
+    font: inherit;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.shared-whiteboard__mode:hover,
+.shared-whiteboard__clear:hover,
+.shared-whiteboard__swatch:hover {
+    transform: translateY(-1px);
+}
+
+.shared-whiteboard__mode.is-active {
+    background: color-mix(in srgb, var(--whiteboard-accent, #79ffe1) 18%, rgba(255, 255, 255, 0.04));
+    border-color: color-mix(in srgb, var(--whiteboard-accent, #79ffe1) 58%, rgba(255, 255, 255, 0.08));
+}
+
+.shared-whiteboard__palette {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.shared-whiteboard__swatch {
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    background: var(--swatch-color);
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.shared-whiteboard__swatch.is-active {
+    border-color: #ffffff;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.08);
+}
+
+.shared-whiteboard__range {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 42px;
+    padding: 0 14px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(225, 231, 239, 0.74);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.shared-whiteboard__range input {
+    width: 120px;
+}
+
+.shared-whiteboard__note-input {
+    display: grid;
+    gap: 10px;
+}
+
+.shared-whiteboard__note-input span {
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(225, 231, 239, 0.7);
+}
+
+.shared-whiteboard__note-input textarea {
+    width: 100%;
+    min-height: 78px;
+    resize: vertical;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f6f8fc;
+    font: inherit;
+    line-height: 1.5;
+    padding: 14px 16px;
+    outline: none;
+}
+
+.shared-whiteboard__note-input textarea:focus {
+    border-color: color-mix(in srgb, var(--whiteboard-accent, #79ffe1) 58%, rgba(255, 255, 255, 0.08));
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--whiteboard-accent, #79ffe1) 14%, transparent);
+}
+
+.shared-whiteboard__board-wrap {
+    position: relative;
+}
+
+.shared-whiteboard__board {
+    position: relative;
+    aspect-ratio: 1000 / 640;
+    border-radius: 28px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+        radial-gradient(circle at top left, color-mix(in srgb, var(--whiteboard-accent, #79ffe1) 12%, transparent), transparent 32%),
+        linear-gradient(180deg, rgba(13, 18, 29, 0.98), rgba(8, 12, 20, 0.98));
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.shared-whiteboard__svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+}
+
+.shared-whiteboard__board-wrap.is-draw-mode .shared-whiteboard__svg {
+    cursor: crosshair;
+}
+
+.shared-whiteboard__board-wrap.is-text-mode .shared-whiteboard__svg {
+    cursor: cell;
+}
+
+.shared-whiteboard__empty,
+.shared-whiteboard__loading {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    justify-items: center;
+    text-align: center;
+    pointer-events: none;
+    padding: 24px;
+}
+
+.shared-whiteboard__empty strong,
+.shared-whiteboard__loading span {
+    color: #f6f8fc;
+}
+
+.shared-whiteboard__empty span {
+    margin-top: 8px;
+    max-width: 360px;
+    color: rgba(225, 231, 239, 0.66);
+    line-height: 1.6;
+}
+
+.shared-whiteboard__loading {
+    gap: 10px;
+    background: rgba(8, 12, 20, 0.55);
+    backdrop-filter: blur(4px);
+}
+
+.shared-whiteboard__footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    color: rgba(225, 231, 239, 0.62);
+    font-size: 13px;
+}
+
+@keyframes whiteboardSpin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 820px) {
+    .shared-whiteboard__toolbar,
+    .shared-whiteboard__controls {
+        align-items: stretch;
+    }
+
+    .shared-whiteboard__mode,
+    .shared-whiteboard__clear,
+    .shared-whiteboard__range {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .shared-whiteboard__range {
+        flex-direction: column;
+        padding: 12px 14px;
+    }
+
+    .shared-whiteboard__range input {
+        width: 100%;
+    }
+}

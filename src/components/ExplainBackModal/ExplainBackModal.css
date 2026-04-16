@@ -178,19 +178,27 @@
 
 .explain-modal-voice,
 .explain-modal-submit {
-  min-height: 44px;
-  border-radius: 14px;
+  min-height: 42px;
+  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  transition:
+    transform var(--transition-fast),
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    opacity var(--transition-fast);
 }
 
 .explain-modal-voice {
-  padding: 0 14px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--color-text-muted);
+  padding: 0 16px;
+  background: rgba(93, 135, 255, 0.08);
+  border: 1px solid rgba(93, 135, 255, 0.18);
+  color: #9ce7ff;
 }
 
 .explain-modal-voice.is-live {
@@ -200,20 +208,41 @@
 }
 
 .explain-modal-submit {
-  width: 100%;
+  width: fit-content;
+  min-width: 240px;
   margin-top: 16px;
-  background: linear-gradient(135deg, #5d87ff, #79ffe1);
-  color: #051324;
-  font-weight: 700;
+  padding: 0 20px;
+  align-self: flex-start;
+  background: rgba(93, 135, 255, 0.12);
+  border: 1px solid rgba(93, 135, 255, 0.22);
+  color: #9ce7ff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .explain-modal-submit--secondary {
-  background: linear-gradient(135deg, #30caa1, #a3e635);
+  background: rgba(121, 255, 225, 0.08);
+  border-color: rgba(121, 255, 225, 0.18);
+  color: #b9fff0;
 }
 
 .explain-modal-submit:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.explain-modal-voice:hover,
+.explain-modal-submit:hover {
+  transform: translateY(-1px);
+}
+
+.explain-modal-submit:hover {
+  background: rgba(93, 135, 255, 0.18);
+  border-color: rgba(121, 255, 225, 0.28);
+}
+
+.explain-modal-submit--secondary:hover {
+  background: rgba(121, 255, 225, 0.14);
+  border-color: rgba(121, 255, 225, 0.24);
 }
 
 .explain-modal-error {
@@ -290,6 +319,8 @@
 
 .explain-followup-popup__actions {
   margin-top: 14px;
+  display: flex;
+  justify-content: flex-start;
 }
 
 .explain-modal-empty {
@@ -436,6 +467,11 @@
 
   .explain-followup-popup {
     padding: 16px;
+  }
+
+  .explain-modal-submit {
+    min-width: 0;
+    width: 100%;
   }
 
   .explain-modal-content--embedded {

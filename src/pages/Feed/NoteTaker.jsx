@@ -5,11 +5,11 @@ import { useAuth } from '../../context/AuthContext';
 import './NoteTaker.css';
 
 const FALLBACK_USER_ID = '00000000-0000-0000-0000-000000000001';
-const GLOBAL_FEED_NOTES_ID = 'global-feed-notes';
 
-const NoteTaker = () => {
+const NoteTaker = ({ videoId = '', videoTitle = '' }) => {
     const { user } = useAuth();
     const userId = user?.id || FALLBACK_USER_ID;
+    const activeVideoId = videoId || 'global-feed-notes';
     const [notes, setNotes] = useState('');
     const [saveStatus, setSaveStatus] = useState('saved'); // 'saved', 'saving', 'error', 'loading'
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -20,7 +20,7 @@ const NoteTaker = () => {
     useEffect(() => {
         const loadNotes = async () => {
             setSaveStatus('loading');
-            const data = await fetchVideoNote(userId, GLOBAL_FEED_NOTES_ID);
+            const data = await fetchVideoNote(userId, activeVideoId);
             setNotes(data || '');
             setSaveStatus('saved');
         };
@@ -31,7 +31,7 @@ const NoteTaker = () => {
         return () => {
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         };
-    }, [userId]);
+    }, [userId, activeVideoId]);
 
     // Handle text change with debounce auto-save
     const handleChange = (e) => {
@@ -46,7 +46,7 @@ const NoteTaker = () => {
 
         // Set new debounced timeout (wait 1 second after last keystroke)
         typingTimeoutRef.current = setTimeout(async () => {
-            const success = await upsertVideoNote(userId, GLOBAL_FEED_NOTES_ID, newNotes);
+            const success = await upsertVideoNote(userId, activeVideoId, newNotes);
             if (success) {
                 setSaveStatus('saved');
             } else {
@@ -63,7 +63,8 @@ const NoteTaker = () => {
     const confirmSave = async () => {
         if (noteTitle.trim()) {
             setSaveStatus('saving');
-            const success = await saveUserSummary(userId, noteTitle, notes, 'Book');
+            const summaryTitle = noteTitle.trim() || videoTitle || 'Video note';
+            const success = await saveUserSummary(userId, summaryTitle, notes, 'Book');
             if (success) {
                 setSaveStatus('saved');
                 alert(`Note "${noteTitle}" saved to your profile!`);
@@ -108,7 +109,7 @@ const NoteTaker = () => {
             <div className="note-taker-body">
                 <textarea
                     className="note-taker-input"
-                    placeholder="Write your notes here..."
+                    placeholder={videoTitle ? `Write notes for "${videoTitle}"...` : 'Write your notes here...'}
                     value={notes}
                     onChange={handleChange}
                     disabled={saveStatus === 'loading'}

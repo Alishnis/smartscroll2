@@ -26,6 +26,52 @@ export const fetchYouTubeVideos = async (query = 'educational shorts', maxResult
     }
 };
 
+export const fetchYouTubeVideoById = async (videoId) => {
+    try {
+        const response = await axios.get(`${YOUTUBE_BASE_URL}/videos`, {
+            params: {
+                part: 'snippet',
+                id: videoId,
+                key: YOUTUBE_API_KEY
+            }
+        });
+
+        const item = response.data?.items?.[0];
+        if (!item) return null;
+
+        return {
+            id: { videoId: item.id },
+            snippet: item.snippet
+        };
+    } catch (error) {
+        console.error('Error fetching YouTube video by ID:', error);
+        return null;
+    }
+};
+
+export const fetchYouTubeVideosByIds = async (videoIds = []) => {
+    try {
+        const validIds = [...new Set(videoIds.filter(Boolean))].slice(0, 50);
+        if (!validIds.length) return [];
+
+        const response = await axios.get(`${YOUTUBE_BASE_URL}/videos`, {
+            params: {
+                part: 'snippet',
+                id: validIds.join(','),
+                key: YOUTUBE_API_KEY
+            }
+        });
+
+        return (response.data?.items || []).map((item) => ({
+            id: { videoId: item.id },
+            snippet: item.snippet
+        }));
+    } catch (error) {
+        console.error('Error fetching YouTube videos by IDs:', error);
+        return [];
+    }
+};
+
 export const fetchYouTubeTranscript = async (videoId) => {
     try {
         const response = await axios.get(`${LOCAL_API_BASE_URL}/youtube-transcript`, {

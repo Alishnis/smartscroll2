@@ -11,6 +11,13 @@
   animation: fadeIn 0.4s ease;
 }
 
+@media (max-width: 760px) {
+  .main-content {
+    padding-top: 96px;
+    padding-bottom: 104px;
+  }
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

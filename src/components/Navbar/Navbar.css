@@ -130,3 +130,28 @@
     color: #ef4444;
     background-color: rgba(239, 68, 68, 0.1);
 }
+
+@media (max-width: 760px) {
+    .navbar-container {
+        bottom: 14px;
+        padding: 0 12px;
+    }
+
+    .navbar {
+        width: min(100%, 344px);
+        justify-content: space-between;
+        gap: 4px;
+        padding: 8px 10px;
+        border-radius: 999px;
+    }
+
+    .nav-item {
+        width: 38px;
+        height: 38px;
+    }
+
+    .nav-item svg {
+        width: 20px;
+        height: 20px;
+    }
+}

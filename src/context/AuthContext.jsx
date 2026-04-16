@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 const AuthContext = createContext(null);
+const AUTH_TIMEOUT_MS = 4000;
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
@@ -15,13 +16,16 @@ export const AuthProvider = ({ children }) => {
             currentUser.user_metadata?.username ||
             currentUser.email?.split('@')[0] ||
             'Learner';
+        const role =
+            currentUser.user_metadata?.role ||
+            'Student';
 
         const { error } = await supabase
             .from('profiles')
             .upsert([{
                 id: currentUser.id,
                 username,
-                role: 'Knowledge Explorer',
+                role,
                 updated_at: new Date().toISOString()
             }], {
                 onConflict: 'id'
@@ -33,19 +37,30 @@ export const AuthProvider = ({ children }) => {
     };
 
     useEffect(() => {
+        let isMounted = true;
+        const authTimeout = window.setTimeout(() => {
+            if (!isMounted) return;
+            setLoading(false);
+        }, AUTH_TIMEOUT_MS);
+
         // Get the initial session
         supabase.auth.getSession().then(async ({ data: { session } }) => {
+            if (!isMounted) return;
             setSession(session);
             setUser(session?.user ?? null);
             if (session?.user) {
                 await ensureProfile(session.user);
             }
             setLoading(false);
+        }).catch((error) => {
+            console.error('Error restoring session:', error);
+            setLoading(false);
         });
 
         // Listen for auth state changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (_event, session) => {
+                if (!isMounted) return;
                 setSession(session);
                 setUser(session?.user ?? null);
                 if (session?.user) {
@@ -55,7 +70,11 @@ export const AuthProvider = ({ children }) => {
             }
         );
 
-        return () => subscription.unsubscribe();
+        return () => {
+            isMounted = false;
+            window.clearTimeout(authTimeout);
+            subscription.unsubscribe();
+        };
     }, []);
 
     const signInWithOAuth = async (provider = 'google') => {
@@ -77,13 +96,14 @@ export const AuthProvider = ({ children }) => {
         return { error };
     };
 
-    const signUpWithEmail = async (email, password, username = '') => {
+    const signUpWithEmail = async (email, password, username = '', role = 'Student') => {
         const { error } = await supabase.auth.signUp({
             email,
             password,
             options: {
                 data: {
-                    username: username || email.split('@')[0]
+                    username: username || email.split('@')[0],
+                    role
                 }
             }
         });
@@ -92,8 +112,12 @@ export const AuthProvider = ({ children }) => {
     };
 
     const signOut = async () => {
+        setSession(null);
+        setUser(null);
         const { error } = await supabase.auth.signOut();
-        if (error) console.error('Error signing out:', error.message);
+        if (error) {
+            console.error('Error signing out:', error.message);
+        }
     };
 
     const value = {

@@ -11,6 +11,7 @@ const AuthModal = ({ isOpen, onClose }) => {
     const { signInWithEmail, signUpWithEmail } = useAuth();
     const [mode, setMode] = useState('login');
     const [username, setUsername] = useState('');
+    const [role, setRole] = useState('Student');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -27,12 +28,16 @@ const AuthModal = ({ isOpen, onClose }) => {
 
         const action = mode === 'login'
             ? signInWithEmail(email, password)
-            : signUpWithEmail(email, password, username);
+            : signUpWithEmail(email, password, username, role);
 
         const { error: authError } = await action;
 
         if (authError) {
-            setError(authError.message);
+            if (authError.message?.toLowerCase().includes('database error saving new user')) {
+                setError(t.register_db_error);
+            } else {
+                setError(authError.message);
+            }
             setLoading(false);
             return;
         }
@@ -78,10 +83,32 @@ const AuthModal = ({ isOpen, onClose }) => {
 
                 <form className="auth-form" onSubmit={handleSubmit}>
                     {mode === 'register' ? (
-                        <label className="auth-field">
-                            <span>{t.username}</span>
-                            <input value={username} onChange={(event) => setUsername(event.target.value)} required />
-                        </label>
+                        <>
+                            <label className="auth-field">
+                                <span>{t.username}</span>
+                                <input value={username} onChange={(event) => setUsername(event.target.value)} required />
+                            </label>
+
+                            <div className="auth-field">
+                                <span>{t.role_label}</span>
+                                <div className="auth-role-grid">
+                                    <button
+                                        type="button"
+                                        className={`auth-role-option${role === 'Student' ? ' is-active' : ''}`}
+                                        onClick={() => setRole('Student')}
+                                    >
+                                        {t.role_student}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`auth-role-option${role === 'Teacher' ? ' is-active' : ''}`}
+                                        onClick={() => setRole('Teacher')}
+                                    >
+                                        {t.role_teacher}
+                                    </button>
+                                </div>
+                            </div>
+                        </>
                     ) : null}
 
                     <label className="auth-field">

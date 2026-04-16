@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import AuthModal from '../AuthModal/AuthModal';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -8,9 +8,15 @@ import './Header.css';
 
 const Header = () => {
     const { user, isAuthenticated, signOut } = useAuth();
+    const navigate = useNavigate();
     const { language } = useLanguage();
     const t = translations[language].header;
     const [isAuthOpen, setIsAuthOpen] = React.useState(false);
+
+    const handleLogout = async () => {
+        await signOut();
+        navigate('/');
+    };
 
     return (
         <>
@@ -58,8 +64,9 @@ const Header = () => {
                         <>
                             <span className="header-user-pill">{user?.email}</span>
                             <button
-                                onClick={signOut}
+                                onClick={handleLogout}
                                 className="header-link header-link--cta"
+                                type="button"
                             >
                                 {t.logout}
                             </button>

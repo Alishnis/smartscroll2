@@ -198,3 +198,27 @@
 .summary-info p {
     font-size: 13px;
 }
+
+.written-note-item {
+    align-items: flex-start;
+}
+
+.written-note-link {
+    display: inline-flex;
+    margin-top: 10px;
+    color: #9ce7ff;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.written-note-link:hover {
+    color: #d7fbff;
+}
+
+@media (max-width: 860px) {
+    .profile-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
