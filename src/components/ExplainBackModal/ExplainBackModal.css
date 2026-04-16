@@ -254,6 +254,35 @@
   color: #ffb7b7;
 }
 
+.explain-assignment-banner {
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.explain-assignment-banner.is-success {
+  background: rgba(78, 201, 140, 0.14);
+  border-color: rgba(78, 201, 140, 0.28);
+}
+
+.explain-assignment-banner.is-pending {
+  background: rgba(255, 196, 87, 0.12);
+  border-color: rgba(255, 196, 87, 0.24);
+}
+
+.explain-assignment-banner__title {
+  font-size: 1rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.explain-assignment-banner p {
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
 .explain-followup-popup-overlay {
   position: fixed;
   inset: 0;

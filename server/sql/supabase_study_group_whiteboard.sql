@@ -1,5 +1,15 @@
 begin;
 
+create extension if not exists pgcrypto;
+
+do $$
+begin
+    if to_regclass('public.study_groups') is null then
+        raise exception 'public.study_groups does not exist. Run supabase_study_groups_reset.sql first.';
+    end if;
+end;
+$$;
+
 create table if not exists public.study_group_whiteboard_events (
     id uuid primary key default gen_random_uuid(),
     group_id uuid not null references public.study_groups(id) on delete cascade,
@@ -13,6 +23,9 @@ create index if not exists study_group_whiteboard_events_group_idx
     on public.study_group_whiteboard_events (group_id, created_at asc);
 
 alter table public.study_group_whiteboard_events enable row level security;
+
+grant usage on schema public to authenticated;
+grant select, insert on public.study_group_whiteboard_events to authenticated;
 
 drop policy if exists "study_group_whiteboard_events_select" on public.study_group_whiteboard_events;
 create policy "study_group_whiteboard_events_select"

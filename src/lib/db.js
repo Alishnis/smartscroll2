@@ -515,10 +515,68 @@ export const awardSmartCoins = async ({
 
         if (updateError) throw updateError;
 
+        if (Number(minutesSpentDelta || 0) > 0) {
+            const derivedHours = Math.floor(newMinutes / 60);
+            const { error: profileUpdateError } = await supabase
+                .from('profiles')
+                .upsert([{
+                    id: userId,
+                    time_saved_hours: derivedHours,
+                    updated_at: new Date().toISOString()
+                }], { onConflict: 'id' });
+
+            if (profileUpdateError) {
+                console.error('Error updating derived time_saved_hours:', profileUpdateError);
+            }
+        }
+
         return { ok: true, balance: newBalance };
     } catch (error) {
         console.error('Error awarding smart coins:', error);
         return { ok: false, balance: 0 };
+    }
+};
+
+export const recordMinutesSpent = async ({
+    userId = '00000000-0000-0000-0000-000000000001',
+    minutesSpentDelta = 1
+}) => {
+    try {
+        const delta = Number(minutesSpentDelta || 0);
+        if (!delta || delta <= 0) {
+            return { ok: false, minutes: 0 };
+        }
+
+        const profile = await ensureGamificationProfile(userId);
+        const newMinutes = Number(profile.total_minutes_spent || 0) + delta;
+
+        const { error: updateError } = await supabase
+            .from('gamification_profiles')
+            .update({
+                total_minutes_spent: newMinutes,
+                updated_at: new Date().toISOString()
+            })
+            .eq('user_id', userId);
+
+        if (updateError) throw updateError;
+
+        const derivedHours = Math.floor(newMinutes / 60);
+        const { error: profileUpdateError } = await supabase
+            .from('profiles')
+            .upsert([{
+                id: userId,
+                time_saved_hours: derivedHours,
+                updated_at: new Date().toISOString()
+            }], { onConflict: 'id' });
+
+        if (profileUpdateError) {
+            console.error('Error updating derived time_saved_hours:', profileUpdateError);
+        }
+
+        return { ok: true, minutes: newMinutes };
+    } catch (error) {
+        console.error('Error recording minutes spent:', error);
+        return { ok: false, minutes: 0 };
     }
 };
 
@@ -1412,18 +1470,57 @@ export const upsertVideoNote = async (userId, videoId, content) => {
 /**
  * Save a new user summary/note
  */
-export const saveUserSummary = async (userId, title, content, iconName = 'Book') => {
+export const saveUserSummary = async (userId, title, content, iconName = 'Book', options = {}) => {
     try {
+        const sourceVideoId = String(options.sourceVideoId || '').trim();
+        const storedContent = sourceVideoId
+            ? `${content}\n\n[[smartscroll_video:${sourceVideoId}]]`
+            : content;
+
         const { error } = await supabase
             .from('summaries')
             .insert([{
                 user_id: userId,
                 title: title,
-                content: content,
+                content: storedContent,
                 icon_name: iconName
             }]);
 
         if (error) throw error;
+
+        const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('summaries_read')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (profileError && profileError.code !== 'PGRST116') {
+            throw profileError;
+        }
+
+        const nextSummariesRead = Number(profileData?.summaries_read || 0) + 1;
+        const { error: updateError } = await supabase
+            .from('profiles')
+            .upsert([{
+                id: userId,
+                summaries_read: nextSummariesRead,
+                updated_at: new Date().toISOString()
+            }], { onConflict: 'id' });
+
+        if (updateError) throw updateError;
+
+        if (nextSummariesRead > 0 && nextSummariesRead % 10 === 0) {
+            await awardSmartCoins({
+                userId,
+                amount: 25,
+                reason: 'summary_milestone',
+                idempotencyKey: `summary-milestone-${userId}-${nextSummariesRead}`,
+                metadata: {
+                    summariesRead: nextSummariesRead
+                }
+            });
+        }
+
         return true;
     } catch (error) {
         console.error('Error saving summary:', error);

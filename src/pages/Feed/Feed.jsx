@@ -4,7 +4,7 @@ import { Heart, Eye, MoreVertical, Share2, EyeOff, ArrowLeft, Search, Brain, Fil
 import { fetchYouTubeTranscript, fetchYouTubeVideoById, fetchYouTubeVideos, summarizeVideoTranscript } from '../../lib/api';
 import SpotlightCard from '../../components/SpotlightCard/SpotlightCard';
 import ExplainBackModal from '../../components/ExplainBackModal/ExplainBackModal';
-import { fetchUserProfile } from '../../lib/db';
+import { fetchUserProfile, saveUserSummary } from '../../lib/db';
 import { createStudyGroupAssignment, listOwnedStudyGroups } from '../../lib/studyGroups';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -125,6 +125,15 @@ const Feed = () => {
         loadVideoById();
     }, [searchParams, videos, selectedVideo]);
 
+    const assignmentContext = selectedVideo?.id?.videoId && searchParams.get('video') === selectedVideo.id.videoId
+        ? {
+            assignmentId: searchParams.get('assignmentId') || '',
+            assignmentTitle: searchParams.get('assignmentTitle') || selectedVideo?.snippet?.title || '',
+            requiredScore: Number(searchParams.get('requiredScore') || 0),
+            groupId: searchParams.get('groupId') || ''
+        }
+        : null;
+
     const handleSearch = (e) => {
         e.preventDefault();
         if (searchInput.trim()) {
@@ -221,6 +230,23 @@ const Feed = () => {
             });
 
             summaryCacheRef.current[videoId] = summaryText;
+
+            if (user?.id && summaryText) {
+                const summarySaved = await saveUserSummary(
+                    user.id,
+                    video.snippet.title || t.summary_title,
+                    summaryText,
+                    'FileText',
+                    {
+                        sourceVideoId: videoId
+                    }
+                );
+
+                if (!summarySaved) {
+                    console.error('Failed to save generated video summary to profile.');
+                }
+            }
+
             setVideoSummary({
                 video,
                 text: summaryText,
@@ -416,6 +442,7 @@ const Feed = () => {
                                 contentType="youtube"
                                 sourceTitle={explainVideo?.video?.snippet?.title || ''}
                                 userId={userId}
+                                assignmentContext={assignmentContext}
                                 variant="embedded"
                             />
                         </div>

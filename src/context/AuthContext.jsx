@@ -2,7 +2,25 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 const AuthContext = createContext(null);
-const AUTH_TIMEOUT_MS = 4000;
+const AUTH_BOOT_TIMEOUT_MS = 4000;
+const AUTH_REQUEST_TIMEOUT_MS = 10000;
+
+const withTimeout = async (promiseFactory, timeoutMs, timeoutMessage) => {
+    let timeoutId;
+
+    try {
+        return await Promise.race([
+            Promise.resolve().then(promiseFactory),
+            new Promise((_, reject) => {
+                timeoutId = window.setTimeout(() => {
+                    reject(new Error(timeoutMessage));
+                }, timeoutMs);
+            })
+        ]);
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
+};
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
@@ -20,19 +38,27 @@ export const AuthProvider = ({ children }) => {
             currentUser.user_metadata?.role ||
             'Student';
 
-        const { error } = await supabase
-            .from('profiles')
-            .upsert([{
-                id: currentUser.id,
-                username,
-                role,
-                updated_at: new Date().toISOString()
-            }], {
-                onConflict: 'id'
-            });
+        try {
+            const { error } = await withTimeout(
+                () => supabase
+                    .from('profiles')
+                    .upsert([{
+                        id: currentUser.id,
+                        username,
+                        role,
+                        updated_at: new Date().toISOString()
+                    }], {
+                        onConflict: 'id'
+                    }),
+                AUTH_REQUEST_TIMEOUT_MS,
+                'ensureProfile timed out'
+            );
 
-        if (error) {
-            console.error('Error ensuring profile:', error.message);
+            if (error) {
+                console.error('Error ensuring profile:', error.message);
+            }
+        } catch (error) {
+            console.error('Error ensuring profile:', error.message || error);
         }
     };
 
@@ -41,32 +67,37 @@ export const AuthProvider = ({ children }) => {
         const authTimeout = window.setTimeout(() => {
             if (!isMounted) return;
             setLoading(false);
-        }, AUTH_TIMEOUT_MS);
+        }, AUTH_BOOT_TIMEOUT_MS);
 
         // Get the initial session
-        supabase.auth.getSession().then(async ({ data: { session } }) => {
+        withTimeout(
+            () => supabase.auth.getSession(),
+            AUTH_REQUEST_TIMEOUT_MS,
+            'getSession timed out'
+        ).then(({ data: { session } }) => {
             if (!isMounted) return;
             setSession(session);
             setUser(session?.user ?? null);
-            if (session?.user) {
-                await ensureProfile(session.user);
-            }
             setLoading(false);
+            if (session?.user) {
+                void ensureProfile(session.user);
+            }
         }).catch((error) => {
             console.error('Error restoring session:', error);
+            if (!isMounted) return;
             setLoading(false);
         });
 
         // Listen for auth state changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (_event, session) => {
+            (_event, session) => {
                 if (!isMounted) return;
                 setSession(session);
                 setUser(session?.user ?? null);
-                if (session?.user) {
-                    await ensureProfile(session.user);
-                }
                 setLoading(false);
+                if (session?.user) {
+                    void ensureProfile(session.user);
+                }
             }
         );
 
@@ -78,45 +109,75 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const signInWithOAuth = async (provider = 'google') => {
-        const { error } = await supabase.auth.signInWithOAuth({
-            provider,
-            options: {
-                redirectTo: window.location.origin,
-            },
-        });
+        const { error } = await withTimeout(
+            () => supabase.auth.signInWithOAuth({
+                provider,
+                options: {
+                    redirectTo: window.location.origin,
+                },
+            }),
+            AUTH_REQUEST_TIMEOUT_MS,
+            'OAuth sign-in timed out'
+        );
         if (error) console.error('Error signing in:', error.message);
     };
 
     const signInWithEmail = async (email, password) => {
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
-        if (error) console.error('Error signing in:', error.message);
-        return { error };
+        try {
+            const { error } = await withTimeout(
+                () => supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                }),
+                AUTH_REQUEST_TIMEOUT_MS,
+                'Sign-in timed out'
+            );
+            if (error) console.error('Error signing in:', error.message);
+            return { error };
+        } catch (error) {
+            console.error('Error signing in:', error.message || error);
+            return { error };
+        }
     };
 
     const signUpWithEmail = async (email, password, username = '', role = 'Student') => {
-        const { error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    username: username || email.split('@')[0],
-                    role
-                }
-            }
-        });
-        if (error) console.error('Error signing up:', error.message);
-        return { error };
+        try {
+            const { error } = await withTimeout(
+                () => supabase.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            username: username || email.split('@')[0],
+                            role
+                        }
+                    }
+                }),
+                AUTH_REQUEST_TIMEOUT_MS,
+                'Sign-up timed out'
+            );
+            if (error) console.error('Error signing up:', error.message);
+            return { error };
+        } catch (error) {
+            console.error('Error signing up:', error.message || error);
+            return { error };
+        }
     };
 
     const signOut = async () => {
         setSession(null);
         setUser(null);
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-            console.error('Error signing out:', error.message);
+        try {
+            const { error } = await withTimeout(
+                () => supabase.auth.signOut(),
+                AUTH_REQUEST_TIMEOUT_MS,
+                'Sign-out timed out'
+            );
+            if (error) {
+                console.error('Error signing out:', error.message);
+            }
+        } catch (error) {
+            console.error('Error signing out:', error.message || error);
         }
     };
 

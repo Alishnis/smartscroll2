@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { LoaderCircle, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -8,7 +8,7 @@ import './AuthModal.css';
 const AuthModal = ({ isOpen, onClose }) => {
     const { language } = useLanguage();
     const t = translations[language].auth;
-    const { signInWithEmail, signUpWithEmail } = useAuth();
+    const { signInWithEmail, signUpWithEmail, user } = useAuth();
     const [mode, setMode] = useState('login');
     const [username, setUsername] = useState('');
     const [role, setRole] = useState('Student');
@@ -17,6 +17,17 @@ const AuthModal = ({ isOpen, onClose }) => {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        if (mode === 'login' && user?.id) {
+            setLoading(false);
+            onClose();
+        }
+    }, [isOpen, mode, onClose, user?.id]);
 
     if (!isOpen) return null;
 

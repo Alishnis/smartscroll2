@@ -81,6 +81,7 @@ const ExplainBackModal = ({
   contentType = 'generic',
   sourceTitle = '',
   userId = '00000000-0000-0000-0000-000000000001',
+  assignmentContext = null,
   variant = 'overlay',
 }) => {
   const { language } = useLanguage();
@@ -98,6 +99,7 @@ const ExplainBackModal = ({
   const [followUpAnswers, setFollowUpAnswers] = useState([]);
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
   const [sessionId, setSessionId] = useState(null);
+  const [assignmentCompletion, setAssignmentCompletion] = useState(null);
   const recognitionRef = useRef(null);
 
   const canSubmit = useMemo(
@@ -125,6 +127,7 @@ const ExplainBackModal = ({
     setFollowUpAnswers([]);
     setIsFollowUpOpen(false);
     setSessionId(null);
+    setAssignmentCompletion(null);
   }, [isOpen, initialTopic]);
 
   useEffect(() => {
@@ -219,6 +222,7 @@ const ExplainBackModal = ({
     setIsLoading(true);
     setError('');
     setResult(null);
+    setAssignmentCompletion(null);
 
     try {
       const response = await generateExplainBackFollowUps({
@@ -311,6 +315,20 @@ const ExplainBackModal = ({
       }
 
       setResult(response);
+      if (assignmentContext?.assignmentId && Number(assignmentContext?.requiredScore || 0) > 0) {
+        const score = Number(response.overallScore || 0);
+        const requiredScore = Number(assignmentContext.requiredScore || 0);
+
+        setAssignmentCompletion({
+          isAssignment: true,
+          passed: score >= requiredScore,
+          score,
+          requiredScore,
+          title: assignmentContext.assignmentTitle || topic
+        });
+      } else {
+        setAssignmentCompletion(null);
+      }
       setIsFollowUpOpen(false);
     } catch (evaluationError) {
       setError(evaluationError.message || t.generic_error);
@@ -326,6 +344,7 @@ const ExplainBackModal = ({
     setFollowUpQuestions([]);
     setFollowUpAnswers([]);
     setIsFollowUpOpen(false);
+    setAssignmentCompletion(null);
   };
 
   const content = (
@@ -398,6 +417,23 @@ const ExplainBackModal = ({
             </>
           ) : (
             <div className="explain-modal-results__content">
+              {assignmentCompletion?.isAssignment ? (
+                <div className={`explain-assignment-banner ${assignmentCompletion.passed ? 'is-success' : 'is-pending'}`}>
+                  <div className="explain-assignment-banner__title">
+                    {assignmentCompletion.passed ? t.assignment_success_title : t.assignment_pending_title}
+                  </div>
+                  <p>
+                    {assignmentCompletion.passed
+                      ? t.assignment_success_message
+                        .replace('{title}', assignmentCompletion.title || t.assignment_default_title)
+                        .replace('{score}', assignmentCompletion.score)
+                      : t.assignment_pending_message
+                        .replace('{required}', assignmentCompletion.requiredScore)
+                        .replace('{score}', assignmentCompletion.score)}
+                  </p>
+                </div>
+              ) : null}
+
               <div className="explain-modal-summary">
                 <div>
                   <span>{t.overall_score}</span>

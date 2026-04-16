@@ -8,8 +8,6 @@ import { translations } from '../../i18n/translations';
 import { fetchUserProfile } from '../../lib/db';
 import {
     createStudyGroup,
-    DEFAULT_DISCOVER_GROUP,
-    isSeededStudyGroup,
     joinStudyGroup,
     joinStudyGroupByCode,
     leaveStudyGroup,
@@ -20,8 +18,7 @@ import {
 } from '../../lib/studyGroups';
 import './Groups.css';
 
-const REQUEST_TIMEOUT_MS = 6000;
-const CREATE_CLASS_TIMEOUT_MS = 4500;
+const REQUEST_TIMEOUT_MS = 12000;
 
 const uniqueById = (items) => items.filter(
     (item, index, collection) => item?.id && collection.findIndex((candidate) => candidate.id === item.id) === index
@@ -221,24 +218,13 @@ const Groups = () => {
         setCreatingClass(true);
         setCreateClassError('');
 
-        const result = await Promise.race([
-            createStudyGroup({
-                name: className.trim(),
-                description: classDescription.trim(),
-                themeColor: selectedTheme,
-                visibility: 'public',
-                userId: currentUserId
-            }),
-            new Promise((resolve) => {
-                window.setTimeout(() => {
-                    resolve({
-                        ok: false,
-                        group: null,
-                        error: t.create_class_timeout
-                    });
-                }, CREATE_CLASS_TIMEOUT_MS);
-            })
-        ]);
+        const result = await createStudyGroup({
+            name: className.trim(),
+            description: classDescription.trim(),
+            themeColor: selectedTheme,
+            visibility: 'public',
+            userId: currentUserId
+        });
 
         if (!result.ok || !result.group) {
             setCreateClassError(result.error || t.create_class_error);
@@ -268,16 +254,6 @@ const Groups = () => {
     };
 
     const handleJoinGroup = async (group) => {
-        if (isSeededStudyGroup(group)) {
-            navigate(`/groups/${DEFAULT_DISCOVER_GROUP.id}`, {
-                state: {
-                    initialGroup: DEFAULT_DISCOVER_GROUP,
-                    initialMembership: null
-                }
-            });
-            return;
-        }
-
         if (!currentUserId) {
             setPageError(t.join_code_sign_in);
             return;
@@ -537,7 +513,6 @@ const Groups = () => {
                         filteredGroups.map((group) => {
                             const isOwner = group.owner_user_id === currentUserId;
                             const isBusy = busyGroupId === group.id;
-                            const isSeeded = isSeededStudyGroup(group);
 
                             return (
                                 <SpotlightCard

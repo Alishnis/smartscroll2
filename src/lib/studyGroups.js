@@ -6,30 +6,10 @@ const ASSIGNMENT_FIELDS = 'id, group_id, teacher_user_id, title, description, vi
 const WHITEBOARD_EVENT_FIELDS = 'id, group_id, user_id, event_type, payload_json, created_at';
 const DEFAULT_DISCOVER_GROUP_ID = '11111111-1111-4111-8111-111111111111';
 const SYSTEM_GROUP_OWNER_ID = '00000000-0000-0000-0000-000000000000';
-const REMOTE_TIMEOUT_MS = 3200;
-const STORAGE_PREFIX = 'smartscroll.study-groups.v2';
-
-const STORAGE_KEYS = {
-    groups: `${STORAGE_PREFIX}.groups`,
-    memberships: `${STORAGE_PREFIX}.memberships`,
-    messages: `${STORAGE_PREFIX}.messages`,
-    assignments: `${STORAGE_PREFIX}.assignments`,
-    whiteboardEvents: `${STORAGE_PREFIX}.whiteboard-events`
-};
-
-export const DEFAULT_DISCOVER_GROUP = {
-    id: DEFAULT_DISCOVER_GROUP_ID,
-    name: 'SmartScroll Starter Class',
-    description: 'A built-in demo room so Discover never looks empty. Use it as a visual example while the real database-backed classes are being set up.',
-    visibility: 'public',
-    invite_code: 'SMART101',
-    owner_user_id: SYSTEM_GROUP_OWNER_ID,
-    theme_color: '#7c9bff',
-    member_count: 128,
-    created_at: '2026-01-01T00:00:00.000Z',
-    updated_at: '2026-01-01T00:00:00.000Z',
-    is_seeded: true
-};
+const REMOTE_TIMEOUT_MS = 12000;
+const AUTH_LOOKUP_TIMEOUT_MS = 5000;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const STUDY_GROUP_THEME_OPTIONS = [
     '#79ffe1',
@@ -40,8 +20,6 @@ export const STUDY_GROUP_THEME_OPTIONS = [
     '#ff7eb6'
 ];
 
-const canUseStorage = () => typeof window !== 'undefined' && Boolean(window.localStorage);
-
 const normalizeRpcRow = (data) => {
     if (Array.isArray(data)) {
         return data[0] || null;
@@ -50,12 +28,10 @@ const normalizeRpcRow = (data) => {
     return data || null;
 };
 
-const uniqueById = (items = []) => items.filter(
-    (item, index, collection) => item?.id && collection.findIndex((candidate) => candidate.id === item.id) === index
-);
-
 const attachMembershipMeta = (group, membershipRole = null) => {
-    if (!group) return null;
+    if (!group) {
+        return null;
+    }
 
     return {
         ...group,
@@ -71,130 +47,193 @@ const fallbackProfileForUserId = (userId) => ({
     role: userId === SYSTEM_GROUP_OWNER_ID ? 'System' : 'Student'
 });
 
-const readStorage = (key, fallbackValue) => {
-    if (!canUseStorage()) {
-        return fallbackValue;
-    }
-
-    try {
-        const raw = window.localStorage.getItem(key);
-        return raw ? JSON.parse(raw) : fallbackValue;
-    } catch (error) {
-        console.error(`[StudyGroups] Failed to read ${key} from localStorage`, error);
-        return fallbackValue;
-    }
-};
-
-const writeStorage = (key, value) => {
-    if (!canUseStorage()) {
-        return;
-    }
-
-    try {
-        window.localStorage.setItem(key, JSON.stringify(value));
-    } catch (error) {
-        console.error(`[StudyGroups] Failed to write ${key} to localStorage`, error);
-    }
-};
-
-const getLocalGroups = () => readStorage(STORAGE_KEYS.groups, []);
-const setLocalGroups = (groups) => writeStorage(STORAGE_KEYS.groups, uniqueById(groups));
-const getLocalMemberships = () => readStorage(STORAGE_KEYS.memberships, []);
-const setLocalMemberships = (memberships) => writeStorage(STORAGE_KEYS.memberships, memberships);
-const getLocalMessages = () => readStorage(STORAGE_KEYS.messages, []);
-const setLocalMessages = (messages) => writeStorage(STORAGE_KEYS.messages, messages);
-const getLocalAssignments = () => readStorage(STORAGE_KEYS.assignments, []);
-const setLocalAssignments = (assignments) => writeStorage(STORAGE_KEYS.assignments, assignments);
-const getLocalWhiteboardEvents = () => readStorage(STORAGE_KEYS.whiteboardEvents, []);
-const setLocalWhiteboardEvents = (events) => writeStorage(STORAGE_KEYS.whiteboardEvents, events);
-
-const getLocalGroupById = (groupId) => getLocalGroups().find((group) => group.id === groupId) || null;
-
-const updateLocalGroupMemberCount = (groupId) => {
-    const groups = getLocalGroups();
-    const memberships = getLocalMemberships();
-    const targetGroup = groups.find((group) => group.id === groupId);
-
-    if (!targetGroup) {
-        return;
-    }
-
-    const memberCount = memberships.filter((membership) => membership.group_id === groupId).length;
-    const nextGroups = groups.map((group) => (
-        group.id === groupId
-            ? {
-                ...group,
-                member_count: memberCount,
-                updated_at: new Date().toISOString()
-            }
-            : group
-    ));
-
-    setLocalGroups(nextGroups);
-};
-
-const buildLocalInviteCode = () => normalizeStudyGroupInviteCode(
-    crypto.randomUUID().replace(/-/g, '').slice(0, 8)
-);
-
-const buildLocalGroup = ({
-    name,
-    description = '',
-    themeColor = STUDY_GROUP_THEME_OPTIONS[0],
-    visibility = 'public',
-    ownerUserId
-}) => ({
-    id: `local-group-${crypto.randomUUID()}`,
-    name,
-    description,
-    visibility,
-    invite_code: buildLocalInviteCode(),
-    owner_user_id: ownerUserId,
-    theme_color: themeColor,
-    member_count: 1,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    is_local: true
-});
-
-const mergeGroupCollections = (...collections) => uniqueById(
-    collections
-        .flat()
-        .filter(Boolean)
-);
-
-const isLocalGroupId = (groupId) => typeof groupId === 'string' && groupId.startsWith('local-group-');
-const uniqueByEventId = (items = []) => items.filter(
+const uniqueById = (items = []) => items.filter(
     (item, index, collection) => item?.id && collection.findIndex((candidate) => candidate.id === item.id) === index
 );
+
 const sortByCreatedAtAsc = (items = []) => [...items].sort(
     (left, right) => new Date(left.created_at) - new Date(right.created_at)
 );
 
-const runRemote = async (label, operation, fallbackValue = null) => {
+const uniqueByEventId = (items = []) => items.filter(
+    (item, index, collection) => item?.id && collection.findIndex((candidate) => candidate.id === item.id) === index
+);
+
+const buildInviteCode = () => normalizeStudyGroupInviteCode(
+    crypto.randomUUID().replace(/-/g, '').slice(0, 8)
+);
+
+const getPostgrestHeaders = (accessToken, prefer = 'return=representation') => ({
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+    Prefer: prefer
+});
+
+const postgrestInsert = async (table, row, select, accessToken) => {
+    const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/${table}?select=${encodeURIComponent(select)}`,
+        {
+            method: 'POST',
+            headers: getPostgrestHeaders(accessToken),
+            body: JSON.stringify(row)
+        }
+    );
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Insert failed for ${table}.`);
+    }
+
+    const payload = await response.json();
+    return Array.isArray(payload) ? payload[0] || null : payload;
+};
+
+const postgrestUpsert = async (table, row, select, accessToken, onConflict) => {
+    const query = new URLSearchParams({
+        select,
+        on_conflict: onConflict
+    });
+
+    const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/${table}?${query.toString()}`,
+        {
+            method: 'POST',
+            headers: getPostgrestHeaders(accessToken, 'resolution=merge-duplicates,return=representation'),
+            body: JSON.stringify(row)
+        }
+    );
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Upsert failed for ${table}.`);
+    }
+
+    const payload = await response.json();
+    return Array.isArray(payload) ? payload[0] || null : payload;
+};
+
+const postgrestDelete = async (table, filters, accessToken) => {
+    const query = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+        query.set(key, `eq.${value}`);
+    });
+
+    const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/${table}?${query.toString()}`,
+        {
+            method: 'DELETE',
+            headers: getPostgrestHeaders(accessToken, 'return=minimal')
+        }
+    );
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Delete failed for ${table}.`);
+    }
+
+    return true;
+};
+
+const isMissingRpcError = (error) => {
+    const message = String(error?.message || '').toLowerCase();
+    return (
+        message.includes('could not find the function public.') ||
+        message.includes('function public.') ||
+        message.includes('does not exist')
+    );
+};
+
+const callStudyGroupsRpc = async (fnName, args) => {
+    const { data, error } = await supabase.rpc(fnName, args);
+
+    if (error) {
+        throw error;
+    }
+
+    return normalizeRpcRow(data);
+};
+
+const runRemote = async (label, operation) => {
     try {
-        const result = await Promise.race([
+        const data = await Promise.race([
             Promise.resolve().then(operation),
             new Promise((_, reject) => {
                 window.setTimeout(() => {
-                    reject(new Error(`Remote timeout after ${REMOTE_TIMEOUT_MS}ms`));
+                    reject(new Error(`Supabase timeout after ${REMOTE_TIMEOUT_MS}ms`));
                 }, REMOTE_TIMEOUT_MS);
             })
         ]);
 
         return {
             ok: true,
-            data: result,
-            fallback: fallbackValue
+            data,
+            error: null
         };
     } catch (error) {
-        console.error(`[StudyGroups] ${label} remote failed; using local fallback.`, error);
+        console.error(`[StudyGroups] ${label} failed.`, error);
         return {
             ok: false,
-            data: fallbackValue,
+            data: null,
             error
         };
     }
+};
+
+const getCurrentUserId = async (userId = null) => {
+    if (userId) {
+        return userId;
+    }
+
+    try {
+        const result = await Promise.race([
+            supabase.auth.getUser(),
+            new Promise((_, reject) => {
+                window.setTimeout(() => reject(new Error('getUser timed out')), AUTH_LOOKUP_TIMEOUT_MS);
+            })
+        ]);
+
+        return result?.data?.user?.id || null;
+    } catch {
+        return null;
+    }
+};
+
+const getCurrentSession = async () => {
+    try {
+        const result = await Promise.race([
+            supabase.auth.getSession(),
+            new Promise((_, reject) => {
+                window.setTimeout(() => reject(new Error('getSession timed out')), AUTH_LOOKUP_TIMEOUT_MS);
+            })
+        ]);
+
+        return result?.data?.session || null;
+    } catch {
+        return null;
+    }
+};
+
+const ensureAuthenticatedSession = async (userId = null) => {
+    const session = await getCurrentSession();
+    const sessionUserId = session?.user?.id || null;
+    const resolvedUserId = sessionUserId || await getCurrentUserId(userId);
+
+    if (!resolvedUserId || !session?.access_token) {
+        return {
+            ok: false,
+            userId: null,
+            session: null,
+            error: 'Supabase session is missing. Sign in again before changing groups.'
+        };
+    }
+
+    return {
+        ok: true,
+        userId: resolvedUserId,
+        session,
+        error: ''
+    };
 };
 
 const fetchProfilesByIds = async (userIds = []) => {
@@ -214,13 +253,14 @@ const fetchProfilesByIds = async (userIds = []) => {
         }
 
         return Object.fromEntries((data || []).map((profile) => [profile.id, profile]));
-    }, {});
+    });
 
-    if (remote.ok) {
-        return remote.data || {};
+    if (!remote.ok) {
+        return Object.fromEntries(ids.map((id) => [id, fallbackProfileForUserId(id)]));
     }
 
-    return Object.fromEntries(ids.map((id) => [id, fallbackProfileForUserId(id)]));
+    const remoteProfiles = remote.data || {};
+    return Object.fromEntries(ids.map((id) => [id, remoteProfiles[id] || fallbackProfileForUserId(id)]));
 };
 
 export const normalizeStudyGroupInviteCode = (value = '') => value
@@ -235,7 +275,6 @@ export const isSeededStudyGroup = (groupOrId) => (
 );
 
 export const listPublicStudyGroups = async () => {
-    const localGroups = getLocalGroups().filter((group) => group.visibility === 'public');
     const remote = await runRemote('listPublicStudyGroups', async () => {
         const { data, error } = await supabase
             .from('study_groups')
@@ -247,20 +286,15 @@ export const listPublicStudyGroups = async () => {
         }
 
         return data || [];
-    }, []);
+    });
 
-    return mergeGroupCollections(DEFAULT_DISCOVER_GROUP, localGroups, remote.data || []);
+    return remote.ok ? uniqueById(remote.data || []) : [];
 };
 
 export const listMyStudyGroups = async (userId) => {
     if (!userId) {
         return [];
     }
-
-    const localMemberships = getLocalMemberships().filter((membership) => membership.user_id === userId);
-    const localGroups = localMemberships
-        .map((membership) => attachMembershipMeta(getLocalGroupById(membership.group_id), membership.role))
-        .filter(Boolean);
 
     const remote = await runRemote('listMyStudyGroups', async () => {
         const { data, error } = await supabase
@@ -280,19 +314,15 @@ export const listMyStudyGroups = async (userId) => {
         return (data || [])
             .map((row) => attachMembershipMeta(row.study_groups, row.role))
             .filter(Boolean);
-    }, []);
+    });
 
-    return mergeGroupCollections(localGroups, remote.data || []);
+    return remote.ok ? uniqueById(remote.data || []) : [];
 };
 
 export const listOwnedStudyGroups = async (userId) => {
     if (!userId) {
         return [];
     }
-
-    const localOwnedGroups = getLocalGroups()
-        .filter((group) => group.owner_user_id === userId)
-        .map((group) => attachMembershipMeta(group, 'teacher'));
 
     const remote = await runRemote('listOwnedStudyGroups', async () => {
         const { data, error } = await supabase
@@ -306,23 +336,14 @@ export const listOwnedStudyGroups = async (userId) => {
         }
 
         return (data || []).map((group) => attachMembershipMeta(group, 'teacher'));
-    }, []);
+    });
 
-    return mergeGroupCollections(localOwnedGroups, remote.data || []);
+    return remote.ok ? uniqueById(remote.data || []) : [];
 };
 
 export const fetchStudyGroupById = async (groupId) => {
     if (!groupId) {
         return null;
-    }
-
-    if (isSeededStudyGroup(groupId)) {
-        return DEFAULT_DISCOVER_GROUP;
-    }
-
-    const localGroup = getLocalGroupById(groupId);
-    if (localGroup) {
-        return localGroup;
     }
 
     const remote = await runRemote('fetchStudyGroupById', async () => {
@@ -337,22 +358,14 @@ export const fetchStudyGroupById = async (groupId) => {
         }
 
         return data || null;
-    }, null);
+    });
 
-    return remote.data || null;
+    return remote.ok ? (remote.data || null) : null;
 };
 
 export const fetchStudyGroupMembership = async (groupId, userId) => {
     if (!groupId || !userId) {
         return null;
-    }
-
-    const localMembership = getLocalMemberships().find(
-        (membership) => membership.group_id === groupId && membership.user_id === userId
-    );
-
-    if (localMembership) {
-        return localMembership;
     }
 
     const remote = await runRemote('fetchStudyGroupMembership', async () => {
@@ -368,9 +381,9 @@ export const fetchStudyGroupMembership = async (groupId, userId) => {
         }
 
         return data || null;
-    }, null);
+    });
 
-    return remote.data || null;
+    return remote.ok ? (remote.data || null) : null;
 };
 
 export const createStudyGroup = async ({
@@ -380,235 +393,260 @@ export const createStudyGroup = async ({
     visibility = 'public',
     userId = null
 }) => {
-    const ownerUserId = userId || (await supabase.auth.getUser().then(({ data }) => data.user?.id).catch(() => null));
+    const auth = await ensureAuthenticatedSession(userId);
 
-    const remote = await runRemote('createStudyGroup', async () => {
-        const { data, error } = await supabase.rpc('create_study_group', {
-            p_name: name,
-            p_description: description,
-            p_visibility: visibility,
-            p_theme_color: themeColor
-        });
-
-        if (error) {
-            throw error;
-        }
-
-        return attachMembershipMeta(normalizeRpcRow(data), 'teacher');
-    }, null);
-
-    if (remote.ok && remote.data) {
-        return {
-            ok: true,
-            group: remote.data,
-            error: ''
-        };
-    }
-
-    if (!ownerUserId) {
+    if (!auth.ok) {
         return {
             ok: false,
             group: null,
-            error: remote.error?.message || 'Could not create the group.'
+            error: auth.error
         };
     }
 
-    const localGroup = buildLocalGroup({
-        name,
-        description,
-        themeColor,
-        visibility,
-        ownerUserId
+    const remote = await runRemote('createStudyGroup', async () => {
+        try {
+            const createdGroup = await callStudyGroupsRpc('create_study_group', {
+                p_name: name.trim(),
+                p_description: description.trim(),
+                p_visibility: visibility,
+                p_theme_color: themeColor
+            });
+
+            return attachMembershipMeta(createdGroup, 'teacher');
+        } catch (error) {
+            if (!isMissingRpcError(error)) {
+                throw error;
+            }
+        }
+
+        let lastError = null;
+
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+            const inviteCode = buildInviteCode();
+            try {
+                const insertedGroup = await postgrestInsert(
+                    'study_groups',
+                    {
+                        name: name.trim(),
+                        description: description.trim(),
+                        visibility,
+                        invite_code: inviteCode,
+                        owner_user_id: auth.userId,
+                        theme_color: themeColor,
+                        member_count: 1
+                    },
+                    GROUP_FIELDS,
+                    auth.session.access_token
+                );
+
+                await postgrestUpsert(
+                    'study_group_members',
+                    {
+                        group_id: insertedGroup.id,
+                        user_id: auth.userId,
+                        role: 'teacher'
+                    },
+                    'group_id,user_id,role,joined_at',
+                    auth.session.access_token,
+                    'group_id,user_id'
+                );
+
+                return attachMembershipMeta(insertedGroup, 'teacher');
+            } catch (error) {
+                if (String(error?.message || '').includes('duplicate key')) {
+                    lastError = error;
+                    continue;
+                }
+
+                throw error;
+            }
+        }
+
+        throw lastError || new Error('Could not generate a unique invite code.');
     });
 
-    setLocalGroups([localGroup, ...getLocalGroups()]);
-    setLocalMemberships([
-        {
-            group_id: localGroup.id,
-            user_id: ownerUserId,
-            role: 'teacher',
-            joined_at: new Date().toISOString()
-        },
-        ...getLocalMemberships()
-    ]);
-
     return {
-        ok: true,
-        group: attachMembershipMeta(localGroup, 'teacher'),
-        error: '',
-        source: 'local'
+        ok: Boolean(remote.ok && remote.data),
+        group: remote.ok ? (remote.data || null) : null,
+        error: remote.ok ? '' : (remote.error?.message || 'Could not create the group.')
     };
 };
 
 export const joinStudyGroup = async (groupId, userId = null) => {
-    const currentUserId = userId || (await supabase.auth.getUser().then(({ data }) => data.user?.id).catch(() => null));
+    const auth = await ensureAuthenticatedSession(userId);
 
-    if (!currentUserId) {
+    if (!auth.ok) {
         return {
             ok: false,
             group: null,
-            error: 'Sign in before joining a group.'
-        };
-    }
-
-    if (isLocalGroupId(groupId)) {
-        const localGroup = getLocalGroupById(groupId);
-        if (!localGroup) {
-            return { ok: false, group: null, error: 'Group not found.' };
-        }
-
-        const memberships = getLocalMemberships();
-        const exists = memberships.some((membership) => membership.group_id === groupId && membership.user_id === currentUserId);
-
-        if (!exists) {
-            memberships.unshift({
-                group_id: groupId,
-                user_id: currentUserId,
-                role: localGroup.owner_user_id === currentUserId ? 'teacher' : 'student',
-                joined_at: new Date().toISOString()
-            });
-            setLocalMemberships(memberships);
-            updateLocalGroupMemberCount(groupId);
-        }
-
-        return {
-            ok: true,
-            group: attachMembershipMeta(getLocalGroupById(groupId), localGroup.owner_user_id === currentUserId ? 'teacher' : 'student'),
-            error: '',
-            source: 'local'
+            error: auth.error
         };
     }
 
     const remote = await runRemote('joinStudyGroup', async () => {
-        const { data, error } = await supabase.rpc('join_study_group', {
-            p_group_id: groupId
-        });
-
-        if (error) {
-            throw error;
+        try {
+            const group = await callStudyGroupsRpc('join_study_group', {
+                p_group_id: groupId
+            });
+            const membershipRole = group?.owner_user_id === auth.userId ? 'teacher' : 'student';
+            return attachMembershipMeta(group, membershipRole);
+        } catch (error) {
+            if (!isMissingRpcError(error)) {
+                throw error;
+            }
         }
 
-        return attachMembershipMeta(normalizeRpcRow(data), 'student');
-    }, null);
+        const { data: group, error: groupError } = await supabase
+            .from('study_groups')
+            .select(GROUP_FIELDS)
+            .eq('id', groupId)
+            .maybeSingle();
 
-    if (remote.ok && remote.data) {
-        return { ok: true, group: remote.data, error: '' };
-    }
+        if (groupError) {
+            throw groupError;
+        }
 
-    const fallbackGroup = await fetchStudyGroupById(groupId);
-    if (!fallbackGroup) {
-        return { ok: false, group: null, error: remote.error?.message || 'Could not join the group.' };
-    }
+        if (!group) {
+            throw new Error('Group not found.');
+        }
 
-    const memberships = getLocalMemberships();
-    const exists = memberships.some((membership) => membership.group_id === groupId && membership.user_id === currentUserId);
-    if (!exists) {
-        memberships.unshift({
-            group_id: groupId,
-            user_id: currentUserId,
-            role: fallbackGroup.owner_user_id === currentUserId ? 'teacher' : 'student',
-            joined_at: new Date().toISOString()
-        });
-        setLocalMemberships(memberships);
-    }
-    updateLocalGroupMemberCount(groupId);
+        if (group.visibility !== 'public' && group.owner_user_id !== auth.userId) {
+            throw new Error('This group is private.');
+        }
+
+        const membershipRole = group.owner_user_id === auth.userId ? 'teacher' : 'student';
+        await postgrestUpsert(
+            'study_group_members',
+            {
+                group_id: group.id,
+                user_id: auth.userId,
+                role: membershipRole
+            },
+            'group_id,user_id,role,joined_at',
+            auth.session.access_token,
+            'group_id,user_id'
+        );
+
+        return attachMembershipMeta(group, membershipRole);
+    });
 
     return {
-        ok: true,
-        group: attachMembershipMeta(await fetchStudyGroupById(groupId), fallbackGroup.owner_user_id === currentUserId ? 'teacher' : 'student'),
-        error: '',
-        source: 'local'
+        ok: Boolean(remote.ok && remote.data),
+        group: remote.ok ? (remote.data || null) : null,
+        error: remote.ok ? '' : (remote.error?.message || 'Could not join the group.')
     };
 };
 
 export const joinStudyGroupByCode = async (inviteCode, userId = null) => {
     const normalizedCode = normalizeStudyGroupInviteCode(inviteCode);
-    const currentUserId = userId || (await supabase.auth.getUser().then(({ data }) => data.user?.id).catch(() => null));
+    const auth = await ensureAuthenticatedSession(userId);
 
-    if (!currentUserId) {
+    if (!auth.ok) {
         return {
             ok: false,
             group: null,
-            error: 'Sign in before joining a group.'
+            error: auth.error
         };
     }
 
-    const localGroup = getLocalGroups().find((group) => group.invite_code === normalizedCode) || (
-        normalizedCode === DEFAULT_DISCOVER_GROUP.invite_code ? DEFAULT_DISCOVER_GROUP : null
-    );
-
-    if (localGroup && isLocalGroupId(localGroup.id)) {
-        return joinStudyGroup(localGroup.id, currentUserId);
-    }
-
     const remote = await runRemote('joinStudyGroupByCode', async () => {
-        const { data, error } = await supabase.rpc('join_study_group_by_code', {
-            p_invite_code: normalizedCode
-        });
-
-        if (error) {
-            throw error;
+        try {
+            const group = await callStudyGroupsRpc('join_study_group_by_code', {
+                p_invite_code: normalizedCode
+            });
+            const membershipRole = group?.owner_user_id === auth.userId ? 'teacher' : 'student';
+            return attachMembershipMeta(group, membershipRole);
+        } catch (error) {
+            if (!isMissingRpcError(error)) {
+                throw error;
+            }
         }
 
-        return attachMembershipMeta(normalizeRpcRow(data), 'student');
-    }, null);
+        const { data: group, error: groupError } = await supabase
+            .from('study_groups')
+            .select(GROUP_FIELDS)
+            .eq('invite_code', normalizedCode)
+            .maybeSingle();
 
-    if (remote.ok && remote.data) {
-        return { ok: true, group: remote.data, error: '' };
-    }
+        if (groupError) {
+            throw groupError;
+        }
 
-    if (localGroup) {
-        return joinStudyGroup(localGroup.id, currentUserId);
-    }
+        if (!group) {
+            throw new Error('Group not found.');
+        }
+
+        const membershipRole = group.owner_user_id === auth.userId ? 'teacher' : 'student';
+        await postgrestUpsert(
+            'study_group_members',
+            {
+                group_id: group.id,
+                user_id: auth.userId,
+                role: membershipRole
+            },
+            'group_id,user_id,role,joined_at',
+            auth.session.access_token,
+            'group_id,user_id'
+        );
+
+        return attachMembershipMeta(group, membershipRole);
+    });
 
     return {
-        ok: false,
-        group: null,
-        error: remote.error?.message || 'Could not join the group with that code.'
+        ok: Boolean(remote.ok && remote.data),
+        group: remote.ok ? (remote.data || null) : null,
+        error: remote.ok ? '' : (remote.error?.message || 'Could not join the group with that code.')
     };
 };
 
 export const leaveStudyGroup = async (groupId, userId = null) => {
-    const currentUserId = userId || (await supabase.auth.getUser().then(({ data }) => data.user?.id).catch(() => null));
+    const auth = await ensureAuthenticatedSession(userId);
 
-    if (!currentUserId) {
+    if (!auth.ok) {
         return {
             ok: false,
-            error: 'Sign in before leaving a group.'
+            error: auth.error
         };
     }
 
-    if (isLocalGroupId(groupId) || getLocalMemberships().some((membership) => membership.group_id === groupId && membership.user_id === currentUserId)) {
-        const targetGroup = getLocalGroupById(groupId);
-        if (targetGroup?.owner_user_id === currentUserId) {
-            return {
-                ok: false,
-                error: 'Group owners cannot leave their own group.'
-            };
-        }
-
-        setLocalMemberships(
-            getLocalMemberships().filter((membership) => !(membership.group_id === groupId && membership.user_id === currentUserId))
-        );
-        updateLocalGroupMemberCount(groupId);
-
-        return { ok: true, error: '', source: 'local' };
-    }
-
     const remote = await runRemote('leaveStudyGroup', async () => {
-        const { data, error } = await supabase.rpc('leave_study_group', {
-            p_group_id: groupId
-        });
-
-        if (error) {
-            throw error;
+        try {
+            await callStudyGroupsRpc('leave_study_group', {
+                p_group_id: groupId
+            });
+            return true;
+        } catch (error) {
+            if (!isMissingRpcError(error)) {
+                throw error;
+            }
         }
 
-        return Boolean(data ?? true);
-    }, false);
+        const { data: group, error: groupError } = await supabase
+            .from('study_groups')
+            .select('id, owner_user_id')
+            .eq('id', groupId)
+            .maybeSingle();
+
+        if (groupError) {
+            throw groupError;
+        }
+
+        if (!group) {
+            throw new Error('Group not found.');
+        }
+
+        if (group.owner_user_id === auth.userId) {
+            throw new Error('Group owners cannot leave their own group.');
+        }
+
+        return postgrestDelete('study_group_members', {
+            group_id: groupId,
+            user_id: auth.userId
+        }, auth.session.access_token);
+    });
 
     return {
-        ok: Boolean(remote.data),
+        ok: Boolean(remote.ok && remote.data),
         error: remote.ok ? '' : (remote.error?.message || 'Could not leave the group.')
     };
 };
@@ -616,15 +654,6 @@ export const leaveStudyGroup = async (groupId, userId = null) => {
 export const fetchStudyGroupMembers = async (groupId) => {
     if (!groupId) {
         return [];
-    }
-
-    const localMembershipRows = getLocalMemberships().filter((membership) => membership.group_id === groupId);
-    if (localMembershipRows.length) {
-        const localProfileMap = await fetchProfilesByIds(localMembershipRows.map((row) => row.user_id));
-        return localMembershipRows.map((row) => ({
-            ...row,
-            profiles: localProfileMap[row.user_id] || fallbackProfileForUserId(row.user_id)
-        }));
     }
 
     const remote = await runRemote('fetchStudyGroupMembers', async () => {
@@ -645,23 +674,14 @@ export const fetchStudyGroupMembers = async (groupId) => {
             ...row,
             profiles: profileMap[row.user_id] || fallbackProfileForUserId(row.user_id)
         }));
-    }, []);
+    });
 
-    return remote.data || [];
+    return remote.ok ? (remote.data || []) : [];
 };
 
 export const fetchStudyGroupMessages = async (groupId) => {
     if (!groupId) {
         return [];
-    }
-
-    const localMessages = getLocalMessages().filter((message) => message.group_id === groupId);
-    if (localMessages.length) {
-        const profileMap = await fetchProfilesByIds(localMessages.map((message) => message.user_id));
-        return localMessages.map((message) => ({
-            ...message,
-            profiles: profileMap[message.user_id] || fallbackProfileForUserId(message.user_id)
-        }));
     }
 
     const remote = await runRemote('fetchStudyGroupMessages', async () => {
@@ -682,13 +702,13 @@ export const fetchStudyGroupMessages = async (groupId) => {
             ...row,
             profiles: profileMap[row.user_id] || fallbackProfileForUserId(row.user_id)
         }));
-    }, []);
+    });
 
-    return remote.data || [];
+    return remote.ok ? (remote.data || []) : [];
 };
 
 export const subscribeToStudyGroupMessages = (groupId, onMessage) => {
-    if (!groupId || typeof onMessage !== 'function' || isLocalGroupId(groupId)) {
+    if (!groupId || typeof onMessage !== 'function') {
         return () => {};
     }
 
@@ -718,83 +738,53 @@ export const subscribeToStudyGroupMessages = (groupId, onMessage) => {
 };
 
 export const postStudyGroupMessage = async ({ groupId, content, userId = null }) => {
-    const currentUserId = userId || (await supabase.auth.getUser().then(({ data }) => data.user?.id).catch(() => null));
+    const auth = await ensureAuthenticatedSession(userId);
 
-    if (!currentUserId) {
+    if (!auth.ok) {
         return {
             ok: false,
             message: null,
-            error: 'Sign in before sending a message.'
-        };
-    }
-
-    if (isLocalGroupId(groupId) || getLocalMemberships().some((membership) => membership.group_id === groupId && membership.user_id === currentUserId)) {
-        const localMessage = {
-            id: `local-message-${crypto.randomUUID()}`,
-            group_id: groupId,
-            user_id: currentUserId,
-            content,
-            created_at: new Date().toISOString()
-        };
-        setLocalMessages([...getLocalMessages(), localMessage]);
-        const profileMap = await fetchProfilesByIds([currentUserId]);
-
-        return {
-            ok: true,
-            message: {
-                ...localMessage,
-                profiles: profileMap[currentUserId] || fallbackProfileForUserId(currentUserId)
-            },
-            error: '',
-            source: 'local'
+            error: auth.error
         };
     }
 
     const remote = await runRemote('postStudyGroupMessage', async () => {
-        const { data, error } = await supabase.rpc('send_study_group_message', {
-            p_group_id: groupId,
-            p_content: content
-        });
+        let data = null;
 
-        if (error) {
-            throw error;
+        try {
+            data = await callStudyGroupsRpc('send_study_group_message', {
+                p_group_id: groupId,
+                p_content: content.trim()
+            });
+        } catch (error) {
+            if (!isMissingRpcError(error)) {
+                throw error;
+            }
+
+            data = await postgrestInsert(
+                'study_group_messages',
+                {
+                    group_id: groupId,
+                    user_id: auth.userId,
+                    content: content.trim()
+                },
+                MESSAGE_FIELDS,
+                auth.session.access_token
+            );
         }
 
-        const row = normalizeRpcRow(data);
-        const profileMap = await fetchProfilesByIds([row?.user_id]);
+        const profileMap = await fetchProfilesByIds([data?.user_id]);
 
         return {
-            ...row,
-            profiles: profileMap[row?.user_id] || fallbackProfileForUserId(row?.user_id)
+            ...data,
+            profiles: profileMap[data?.user_id] || fallbackProfileForUserId(data?.user_id)
         };
-    }, null);
-
-    if (remote.ok && remote.data) {
-        return {
-            ok: true,
-            message: remote.data,
-            error: ''
-        };
-    }
-
-    const localMessage = {
-        id: `local-message-${crypto.randomUUID()}`,
-        group_id: groupId,
-        user_id: currentUserId,
-        content,
-        created_at: new Date().toISOString()
-    };
-    setLocalMessages([...getLocalMessages(), localMessage]);
-    const profileMap = await fetchProfilesByIds([currentUserId]);
+    });
 
     return {
-        ok: true,
-        message: {
-            ...localMessage,
-            profiles: profileMap[currentUserId] || fallbackProfileForUserId(currentUserId)
-        },
-        error: '',
-        source: 'local'
+        ok: Boolean(remote.ok && remote.data),
+        message: remote.ok ? (remote.data || null) : null,
+        error: remote.ok ? '' : (remote.error?.message || 'Could not send the message.')
     };
 };
 
@@ -807,95 +797,62 @@ export const createStudyGroupAssignment = async ({
     requiredScore = 7,
     userId = null
 }) => {
-    const currentUserId = userId || (await supabase.auth.getUser().then(({ data }) => data.user?.id).catch(() => null));
+    const auth = await ensureAuthenticatedSession(userId);
 
-    if (!currentUserId) {
+    if (!auth.ok) {
         return {
             ok: false,
             assignment: null,
-            error: 'Sign in before creating an assignment.'
-        };
-    }
-
-    if (isLocalGroupId(groupId) || getLocalGroupById(groupId)?.owner_user_id === currentUserId) {
-        const localAssignment = {
-            id: `local-assignment-${crypto.randomUUID()}`,
-            group_id: groupId,
-            teacher_user_id: currentUserId,
-            title,
-            description,
-            video_id: videoId,
-            video_title: videoTitle,
-            required_score: Number(requiredScore || 7),
-            created_at: new Date().toISOString()
-        };
-        setLocalAssignments([localAssignment, ...getLocalAssignments()]);
-
-        return {
-            ok: true,
-            assignment: localAssignment,
-            error: '',
-            source: 'local'
+            error: auth.error
         };
     }
 
     const remote = await runRemote('createStudyGroupAssignment', async () => {
-        const { data, error } = await supabase.rpc('create_study_group_assignment', {
-            p_group_id: groupId,
-            p_title: title,
-            p_description: description,
-            p_video_id: videoId,
-            p_video_title: videoTitle,
-            p_required_score: Number(requiredScore || 7)
-        });
+        let data = null;
 
-        if (error) {
-            throw error;
+        try {
+            data = await callStudyGroupsRpc('create_study_group_assignment', {
+                p_group_id: groupId,
+                p_title: title.trim(),
+                p_description: description.trim(),
+                p_video_id: videoId.trim(),
+                p_video_title: videoTitle.trim(),
+                p_required_score: Number(requiredScore || 7)
+            });
+        } catch (error) {
+            if (!isMissingRpcError(error)) {
+                throw error;
+            }
+
+            data = await postgrestInsert(
+                'study_group_assignments',
+                {
+                    group_id: groupId,
+                    teacher_user_id: auth.userId,
+                    title: title.trim(),
+                    description: description.trim(),
+                    video_id: videoId.trim(),
+                    video_title: videoTitle.trim(),
+                    required_score: Number(requiredScore || 7)
+                },
+                ASSIGNMENT_FIELDS,
+                auth.session.access_token
+            );
         }
 
-        return normalizeRpcRow(data);
-    }, null);
-
-    if (remote.ok && remote.data) {
-        return {
-            ok: true,
-            assignment: remote.data,
-            error: ''
-        };
-    }
-
-    const localAssignment = {
-        id: `local-assignment-${crypto.randomUUID()}`,
-        group_id: groupId,
-        teacher_user_id: currentUserId,
-        title,
-        description,
-        video_id: videoId,
-        video_title: videoTitle,
-        required_score: Number(requiredScore || 7),
-        created_at: new Date().toISOString()
-    };
-    setLocalAssignments([localAssignment, ...getLocalAssignments()]);
+        return data;
+    });
 
     return {
-        ok: true,
-        assignment: localAssignment,
-        error: '',
-        source: 'local'
+        ok: Boolean(remote.ok && remote.data),
+        assignment: remote.ok ? (remote.data || null) : null,
+        error: remote.ok ? '' : (remote.error?.message || 'Could not create the assignment.')
     };
 };
 
 export const fetchStudyGroupAssignments = async (groupId) => {
     if (!groupId) {
         return [];
-    }
-
-    const localAssignments = getLocalAssignments()
-        .filter((assignment) => assignment.group_id === groupId)
-        .sort((left, right) => new Date(right.created_at) - new Date(left.created_at));
-
-    if (localAssignments.length) {
-        return localAssignments;
     }
 
     const remote = await runRemote('fetchStudyGroupAssignments', async () => {
@@ -910,20 +867,14 @@ export const fetchStudyGroupAssignments = async (groupId) => {
         }
 
         return data || [];
-    }, []);
+    });
 
-    return remote.data || [];
+    return remote.ok ? (remote.data || []) : [];
 };
 
 export const fetchStudyGroupWhiteboardEvents = async (groupId) => {
     if (!groupId) {
         return [];
-    }
-
-    const localEvents = getLocalWhiteboardEvents().filter((event) => event.group_id === groupId);
-
-    if (isLocalGroupId(groupId)) {
-        return sortByCreatedAtAsc(localEvents);
     }
 
     const remote = await runRemote('fetchStudyGroupWhiteboardEvents', async () => {
@@ -938,16 +889,13 @@ export const fetchStudyGroupWhiteboardEvents = async (groupId) => {
         }
 
         return data || [];
-    }, []);
+    });
 
-    return sortByCreatedAtAsc(uniqueByEventId([
-        ...(remote.data || []),
-        ...localEvents
-    ]));
+    return remote.ok ? sortByCreatedAtAsc(uniqueByEventId(remote.data || [])) : [];
 };
 
 export const subscribeToStudyGroupWhiteboard = (groupId, onEvent) => {
-    if (!groupId || typeof onEvent !== 'function' || isLocalGroupId(groupId)) {
+    if (!groupId || typeof onEvent !== 'function') {
         return () => {};
     }
 
@@ -978,72 +926,36 @@ export const appendStudyGroupWhiteboardEvent = async ({
     payload = {},
     userId = null
 }) => {
-    const currentUserId = userId || (await supabase.auth.getUser().then(({ data }) => data.user?.id).catch(() => null));
+    const auth = await ensureAuthenticatedSession(userId);
 
-    if (!currentUserId) {
+    if (!auth.ok) {
         return {
             ok: false,
             event: null,
-            error: 'Sign in before using the class board.'
-        };
-    }
-
-    const buildLocalEvent = () => ({
-        id: `local-whiteboard-event-${crypto.randomUUID()}`,
-        group_id: groupId,
-        user_id: currentUserId,
-        event_type: eventType,
-        payload_json: payload,
-        created_at: new Date().toISOString()
-    });
-
-    if (isLocalGroupId(groupId)) {
-        const localEvent = buildLocalEvent();
-        setLocalWhiteboardEvents([...getLocalWhiteboardEvents(), localEvent]);
-
-        return {
-            ok: true,
-            event: localEvent,
-            error: '',
-            source: 'local'
+            error: auth.error
         };
     }
 
     const remote = await runRemote('appendStudyGroupWhiteboardEvent', async () => {
-        const { data, error } = await supabase
-            .from('study_group_whiteboard_events')
-            .insert([{
+        const data = await postgrestInsert(
+            'study_group_whiteboard_events',
+            {
                 group_id: groupId,
-                user_id: currentUserId,
+                user_id: auth.userId,
                 event_type: eventType,
                 payload_json: payload
-            }])
-            .select(WHITEBOARD_EVENT_FIELDS)
-            .single();
-
-        if (error) {
-            throw error;
-        }
+            },
+            WHITEBOARD_EVENT_FIELDS,
+            auth.session.access_token
+        );
 
         return data;
-    }, null);
-
-    if (remote.ok && remote.data) {
-        return {
-            ok: true,
-            event: remote.data,
-            error: ''
-        };
-    }
-
-    const localEvent = buildLocalEvent();
-    setLocalWhiteboardEvents([...getLocalWhiteboardEvents(), localEvent]);
+    });
 
     return {
-        ok: true,
-        event: localEvent,
-        error: '',
-        source: 'local'
+        ok: Boolean(remote.ok && remote.data),
+        event: remote.ok ? (remote.data || null) : null,
+        error: remote.ok ? '' : (remote.error?.message || 'Could not sync the class board.')
     };
 };
 
@@ -1072,9 +984,9 @@ export const fetchExplainBackSessionsForGroupVideos = async ({
             }
 
             return data || [];
-        }, []);
+        });
 
-        return remote.data || [];
+        return remote.ok ? (remote.data || []) : [];
     } catch (error) {
         console.error('Error fetching explain back progress for study groups:', error);
         return [];

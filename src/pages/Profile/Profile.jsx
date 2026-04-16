@@ -13,13 +13,39 @@ import {
     purchaseProfileAccessory
 } from '../../lib/db';
 import { ACCESSORY_CATALOG } from '../../lib/accessories';
-import { fetchYouTubeVideosByIds } from '../../lib/api';
+import { fetchYouTubeVideoById, fetchYouTubeVideosByIds } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { translations } from '../../i18n/translations';
 import './Profile.css';
 
 const FALLBACK_USER_ID = '00000000-0000-0000-0000-000000000001';
 const PAGE_TIMEOUT_MS = 1400;
+const SUMMARY_VIDEO_MARKER_REGEX = /\n?\n?\[\[smartscroll_video:([A-Za-z0-9_-]{6,})\]\]\s*$/;
+const SECONDS_PER_MINUTE = 60;
+
+const formatTimeSpent = (totalSeconds) => {
+    const normalizedSeconds = Math.max(0, Math.floor(Number(totalSeconds || 0)));
+    const hours = Math.floor(normalizedSeconds / 3600);
+    const minutes = Math.floor((normalizedSeconds % 3600) / 60);
+    const seconds = normalizedSeconds % 60;
+
+    return [hours, minutes, seconds]
+        .map((value) => String(value).padStart(2, '0'))
+        .join(':');
+};
+
+const parseSavedSummary = (summary) => {
+    const rawContent = String(summary?.content || '');
+    const markerMatch = rawContent.match(SUMMARY_VIDEO_MARKER_REGEX);
+    const sourceVideoId = markerMatch?.[1] || '';
+    const plainContent = rawContent.replace(SUMMARY_VIDEO_MARKER_REGEX, '').trim();
+
+    return {
+        ...summary,
+        sourceVideoId,
+        plainContent
+    };
+};
 
 const Profile = () => {
     const { user, loading: authLoading } = useAuth();
@@ -34,6 +60,11 @@ const Profile = () => {
     const [noteVideoMap, setNoteVideoMap] = useState({});
     const [loading, setLoading] = useState(true);
     const [busyAccessoryId, setBusyAccessoryId] = useState(null);
+    const [selectedSummary, setSelectedSummary] = useState(null);
+    const [selectedSummaryVideo, setSelectedSummaryVideo] = useState(null);
+    const [loadingSummaryVideo, setLoadingSummaryVideo] = useState(false);
+    const [pendingSeconds, setPendingSeconds] = useState(0);
+    const [syncedSecondsCorrection, setSyncedSecondsCorrection] = useState(0);
 
     const loadProfileData = async () => {
         setLoading(true);
@@ -79,10 +110,45 @@ const Profile = () => {
         });
     }, [authLoading, userId]);
 
+    useEffect(() => {
+        const storageKey = `smartscroll-pending-seconds-${userId}`;
+        let previousPendingSeconds = Number(localStorage.getItem(storageKey) || '0');
+        setPendingSeconds(previousPendingSeconds);
+        setSyncedSecondsCorrection(0);
+
+        const syncPendingSeconds = () => {
+            const nextPendingSeconds = Number(localStorage.getItem(storageKey) || '0');
+            if (nextPendingSeconds < previousPendingSeconds) {
+                const syncedDelta = previousPendingSeconds - nextPendingSeconds;
+                setSyncedSecondsCorrection((current) => current + syncedDelta);
+            }
+            previousPendingSeconds = nextPendingSeconds;
+            setPendingSeconds(nextPendingSeconds);
+        };
+
+        const handleTimeUpdate = (event) => {
+            if (event?.detail?.userId !== userId) {
+                return;
+            }
+            syncPendingSeconds();
+        };
+
+        const intervalId = window.setInterval(syncPendingSeconds, 1000);
+        window.addEventListener('smartscroll-time-spent-updated', handleTimeUpdate);
+
+        return () => {
+            window.clearInterval(intervalId);
+            window.removeEventListener('smartscroll-time-spent-updated', handleTimeUpdate);
+        };
+    }, [userId]);
+
     const ownedAccessoryIds = new Set(purchases.map((item) => item.accessory_id));
     const equippedAccessory = ACCESSORY_CATALOG.find(
         (item) => item.id === gamification?.equipped_accessory_id
     );
+    const totalTrackedSeconds = (
+        Number(gamification?.total_minutes_spent || 0) * SECONDS_PER_MINUTE
+    ) + syncedSecondsCorrection + pendingSeconds;
 
     const handleAccessoryAction = async (accessory) => {
         setBusyAccessoryId(accessory.id);
@@ -104,6 +170,28 @@ const Profile = () => {
 
         await loadProfileData();
         setBusyAccessoryId(null);
+    };
+
+    const openSummaryDetails = async (summary) => {
+        const parsedSummary = parseSavedSummary(summary);
+        setSelectedSummary(parsedSummary);
+        setSelectedSummaryVideo(null);
+
+        if (!parsedSummary.sourceVideoId) {
+            setLoadingSummaryVideo(false);
+            return;
+        }
+
+        setLoadingSummaryVideo(true);
+        const video = await fetchYouTubeVideoById(parsedSummary.sourceVideoId);
+        setSelectedSummaryVideo(video);
+        setLoadingSummaryVideo(false);
+    };
+
+    const closeSummaryDetails = () => {
+        setSelectedSummary(null);
+        setSelectedSummaryVideo(null);
+        setLoadingSummaryVideo(false);
     };
 
     return (
@@ -136,8 +224,8 @@ const Profile = () => {
                 <SpotlightCard className="stat-card">
                     <div className="stat-icon" style={{ color: '#FFAA00' }}><LucideIcons.Clock size={20} /></div>
                     <div className="stat-content">
-                        <h3>{profile?.time_saved_hours || 0}h</h3>
-                        <p className="text-secondary">{t.time_saved}</p>
+                        <h3>{formatTimeSpent(totalTrackedSeconds)}</h3>
+                        <p className="text-secondary">{t.time_spent}</p>
                     </div>
                 </SpotlightCard>
                 <SpotlightCard className="stat-card">
@@ -226,12 +314,27 @@ const Profile = () => {
                     ) : (
                         summaries.map(summary => {
                             const IconComponent = LucideIcons[summary.icon_name] || LucideIcons.TrendingUp;
+                            const parsedSummary = parseSavedSummary(summary);
                             return (
-                                <SpotlightCard key={summary.id} className="summary-item">
+                                <SpotlightCard
+                                    key={summary.id}
+                                    className="summary-item summary-item--interactive"
+                                    onClick={() => openSummaryDetails(summary)}
+                                >
                                     <div className="summary-icon"><IconComponent size={16} /></div>
                                     <div className="summary-info">
                                         <h4>{summary.title}</h4>
-                                        <p className="text-secondary">{summary.content}</p>
+                                        <p className="text-secondary summary-preview">{parsedSummary.plainContent}</p>
+                                        <button
+                                            type="button"
+                                            className="written-note-link summary-open-btn"
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                openSummaryDetails(summary);
+                                            }}
+                                        >
+                                            {t.view_summary}
+                                        </button>
                                     </div>
                                 </SpotlightCard>
                             )
@@ -277,6 +380,56 @@ const Profile = () => {
                     )}
                 </div>
             </div>
+
+            {selectedSummary ? (
+                <div className="profile-summary-modal-overlay" onClick={closeSummaryDetails}>
+                    <div className="profile-summary-modal glass" onClick={(event) => event.stopPropagation()}>
+                        <button type="button" className="profile-summary-modal__close" onClick={closeSummaryDetails}>
+                            <LucideIcons.X size={18} />
+                        </button>
+
+                        <div className="profile-summary-modal__header">
+                            <div>
+                                <span className="video-summary-chip">{t.full_summary}</span>
+                                <h3>{selectedSummary.title}</h3>
+                            </div>
+                        </div>
+
+                        <div className="profile-summary-modal__grid">
+                            <div className="profile-summary-modal__text">
+                                <p>{selectedSummary.plainContent}</p>
+                            </div>
+
+                            <div className="profile-summary-modal__video">
+                                <div className="profile-summary-modal__video-header">
+                                    <span>{t.summary_video}</span>
+                                    {selectedSummary.sourceVideoId ? (
+                                        <Link className="written-note-link" to={`/feed?video=${selectedSummary.sourceVideoId}`}>
+                                            {t.open_video_note}
+                                        </Link>
+                                    ) : null}
+                                </div>
+
+                                {loadingSummaryVideo ? (
+                                    <div className="profile-summary-video-placeholder">{t.processing}</div>
+                                ) : selectedSummaryVideo?.id?.videoId ? (
+                                    <iframe
+                                        width="100%"
+                                        height="100%"
+                                        src={`https://www.youtube.com/embed/${selectedSummaryVideo.id.videoId}`}
+                                        title={selectedSummaryVideo.snippet?.title || selectedSummary.title}
+                                        frameBorder="0"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                    />
+                                ) : (
+                                    <div className="profile-summary-video-placeholder">{t.summary_video_unavailable}</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 };

@@ -7,7 +7,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { translations } from '../../i18n/translations';
 import {
-    DEFAULT_DISCOVER_GROUP,
     createStudyGroupAssignment,
     fetchExplainBackSessionsForGroupVideos,
     fetchStudyGroupAssignments,
@@ -15,7 +14,6 @@ import {
     fetchStudyGroupMembers,
     fetchStudyGroupMembership,
     fetchStudyGroupMessages,
-    isSeededStudyGroup,
     joinStudyGroup,
     leaveStudyGroup,
     postStudyGroupMessage,
@@ -23,7 +21,7 @@ import {
 } from '../../lib/studyGroups';
 import './GroupDetails.css';
 
-const REQUEST_TIMEOUT_MS = 2600;
+const REQUEST_TIMEOUT_MS = 10000;
 
 const extractVideoId = (value) => {
     if (!value) return '';
@@ -138,7 +136,6 @@ const GroupDetails = () => {
     const [joiningGroup, setJoiningGroup] = useState(false);
     const [leavingGroup, setLeavingGroup] = useState(false);
 
-    const isSeeded = isSeededStudyGroup(group);
     const isOwner = Boolean(group?.owner_user_id && currentUserId && group.owner_user_id === currentUserId);
     const isMember = Boolean(isOwner || membership?.group_id || membership?.role);
     const visibleStudents = useMemo(
@@ -206,7 +203,7 @@ const GroupDetails = () => {
 
             if (cancelled) return;
 
-            const nextGroup = groupData || initialGroupFromState || (isSeededStudyGroup(groupId) ? DEFAULT_DISCOVER_GROUP : null);
+            const nextGroup = groupData || initialGroupFromState || null;
             const nextMembership = membershipData || initialMembershipFromState || (
                 nextGroup?.owner_user_id === currentUserId
                     ? { group_id: nextGroup.id, user_id: currentUserId, role: 'teacher' }
@@ -223,7 +220,7 @@ const GroupDetails = () => {
                 return;
             }
 
-            if (!isSeededStudyGroup(nextGroup) && (nextMembership || nextGroup.owner_user_id === currentUserId)) {
+            if (nextMembership || nextGroup.owner_user_id === currentUserId) {
                 await refreshRoomData(nextGroup.id);
             } else {
                 setLoadingRoomData(false);
@@ -238,7 +235,7 @@ const GroupDetails = () => {
     }, [authLoading, groupId, currentUserId]);
 
     useEffect(() => {
-        if (!groupId || !isMember || isSeeded) {
+        if (!groupId || !isMember) {
             return undefined;
         }
 
@@ -463,27 +460,17 @@ const GroupDetails = () => {
                 <SpotlightCard className="study-room-preview">
                     <div className="study-room-preview__copy">
                         <span className="groups-modal-chip">{t.preview_badge}</span>
-                        <h2>{isSeeded ? t.demo_group_title : t.join_to_enter}</h2>
-                        <p>{isSeeded ? t.demo_group_subtitle : t.join_to_enter_subtitle}</p>
+                        <h2>{t.join_to_enter}</h2>
+                        <p>{t.join_to_enter_subtitle}</p>
                     </div>
-                    {isSeeded ? (
-                        <button
-                            type="button"
-                            className="study-room-primary"
-                            onClick={() => navigate('/groups')}
-                        >
-                            {t.back}
-                        </button>
-                    ) : (
-                        <button
-                            type="button"
-                            className="study-room-primary"
-                            onClick={handleJoinGroup}
-                            disabled={joiningGroup}
-                        >
-                            {joiningGroup ? t.joining_group : t.join_this_group}
-                        </button>
-                    )}
+                    <button
+                        type="button"
+                        className="study-room-primary"
+                        onClick={handleJoinGroup}
+                        disabled={joiningGroup}
+                    >
+                        {joiningGroup ? t.joining_group : t.join_this_group}
+                    </button>
                 </SpotlightCard>
             ) : (
                 <>
@@ -545,6 +532,16 @@ const GroupDetails = () => {
                                     assignments.map((assignment) => {
                                         const currentUserState = memberProgress[assignment.id]?.byUser?.[currentUserId];
                                         const isPassed = currentUserState?.passed;
+                                        const assignmentStatusClass = isOwner
+                                            ? 'is-teacher'
+                                            : isPassed
+                                                ? 'is-pass'
+                                                : 'is-pending';
+                                        const assignmentStatusLabel = isOwner
+                                            ? t.assignment_teacher_status
+                                            : isPassed
+                                                ? t.assignment_done
+                                                : t.assignment_pending;
 
                                         return (
                                             <article key={assignment.id} className="study-room-assignment">
@@ -553,8 +550,8 @@ const GroupDetails = () => {
                                                         <h3>{assignment.title}</h3>
                                                         <p>{assignment.description || t.assignment_default_description}</p>
                                                     </div>
-                                                    <span className={`study-room-status ${isPassed ? 'is-pass' : 'is-pending'}`}>
-                                                        {isPassed ? t.assignment_done : t.assignment_pending}
+                                                    <span className={`study-room-status ${assignmentStatusClass}`}>
+                                                        {assignmentStatusLabel}
                                                     </span>
                                                 </div>
 
@@ -572,7 +569,20 @@ const GroupDetails = () => {
                                                 </div>
 
                                                 <div className="study-room-assignment__actions">
-                                                    <button type="button" className="study-room-primary" onClick={() => navigate(`/feed?video=${assignment.video_id}`)}>
+                                                    <button
+                                                        type="button"
+                                                        className="study-room-primary"
+                                                        onClick={() => {
+                                                            const params = new URLSearchParams({
+                                                                video: assignment.video_id,
+                                                                assignmentId: assignment.id,
+                                                                assignmentTitle: assignment.title || '',
+                                                                requiredScore: String(Number(assignment.required_score || 7)),
+                                                                groupId: group.id
+                                                            });
+                                                            navigate(`/feed?${params.toString()}`);
+                                                        }}
+                                                    >
                                                         <PlayCircle size={16} />
                                                         {t.open_assignment_video}
                                                     </button>
