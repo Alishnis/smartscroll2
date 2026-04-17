@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { LoaderCircle, PencilLine, StickyNote, Trash2 } from 'lucide-react';
+import { Eraser, LoaderCircle, PencilLine, StickyNote, Trash2 } from 'lucide-react';
 import {
     appendStudyGroupWhiteboardEvent,
     fetchStudyGroupWhiteboardEvents,
@@ -11,6 +11,7 @@ const BOARD_WIDTH = 1000;
 const BOARD_HEIGHT = 640;
 const DEFAULT_COLORS = ['#f7f9fc', '#79ffe1', '#7c9bff', '#ffd166', '#ff9d6c', '#ff7eb6'];
 const DEFAULT_STROKE_WIDTH = 4;
+const ERASER_HIT_PADDING = 16;
 
 const uniqueEventsById = (items = []) => items.filter(
     (item, index, collection) => item?.id && collection.findIndex((candidate) => candidate.id === item.id) === index
@@ -39,8 +40,78 @@ const buildTextLines = (text = '') => text
     .filter((line, index, collection) => line.length > 0 || index !== collection.length - 1)
     .slice(0, 6);
 
+const distanceToSegment = (point, start, end) => {
+    const deltaX = end.x - start.x;
+    const deltaY = end.y - start.y;
+
+    if (deltaX === 0 && deltaY === 0) {
+        return Math.hypot(point.x - start.x, point.y - start.y);
+    }
+
+    const t = Math.max(0, Math.min(1, (
+        ((point.x - start.x) * deltaX) + ((point.y - start.y) * deltaY)
+    ) / ((deltaX * deltaX) + (deltaY * deltaY))));
+
+    const projectionX = start.x + (t * deltaX);
+    const projectionY = start.y + (t * deltaY);
+
+    return Math.hypot(point.x - projectionX, point.y - projectionY);
+};
+
+const isPointInsideTextElement = (point, element) => {
+    const lines = buildTextLines(element.text);
+    const maxLineLength = Math.max(...lines.map((line) => line.length), 1);
+    const estimatedWidth = Math.min(BOARD_WIDTH, Math.max(72, maxLineLength * 16));
+    const estimatedHeight = Math.max(40, lines.length * 34);
+
+    return (
+        point.x >= element.x - 12 &&
+        point.x <= element.x + estimatedWidth &&
+        point.y >= element.y - 30 &&
+        point.y <= element.y + estimatedHeight
+    );
+};
+
+const isPointNearPathElement = (point, element) => {
+    if (!Array.isArray(element.points) || !element.points.length) {
+        return false;
+    }
+
+    const hitRadius = Math.max(ERASER_HIT_PADDING, (element.strokeWidth || DEFAULT_STROKE_WIDTH) + 8);
+
+    if (element.points.length === 1) {
+        const onlyPoint = element.points[0];
+        return Math.hypot(point.x - onlyPoint.x, point.y - onlyPoint.y) <= hitRadius;
+    }
+
+    for (let index = 1; index < element.points.length; index += 1) {
+        if (distanceToSegment(point, element.points[index - 1], element.points[index]) <= hitRadius) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
+const findTopmostElementAtPoint = (elements, point) => {
+    for (let index = elements.length - 1; index >= 0; index -= 1) {
+        const element = elements[index];
+
+        if (element.type === 'text' && isPointInsideTextElement(point, element)) {
+            return element;
+        }
+
+        if (element.type === 'path' && isPointNearPathElement(point, element)) {
+            return element;
+        }
+    }
+
+    return null;
+};
+
 const normalizeBoardElements = (events = []) => {
     const elements = [];
+    const erasedElementIds = new Set();
 
     sortEvents(events).forEach((event) => {
         if (!event?.id) {
@@ -49,12 +120,25 @@ const normalizeBoardElements = (events = []) => {
 
         if (event.event_type === 'clear') {
             elements.length = 0;
+            erasedElementIds.clear();
             return;
         }
 
         const payload = event.payload_json || {};
 
+        if (event.event_type === 'erase') {
+            const targetEventId = String(payload.targetEventId || '').trim();
+            if (targetEventId) {
+                erasedElementIds.add(targetEventId);
+            }
+            return;
+        }
+
         if (event.event_type === 'path' && Array.isArray(payload.points) && payload.points.length) {
+            if (erasedElementIds.has(event.id)) {
+                return;
+            }
+
             elements.push({
                 id: event.id,
                 type: 'path',
@@ -72,6 +156,10 @@ const normalizeBoardElements = (events = []) => {
         }
 
         if (event.event_type === 'text') {
+            if (erasedElementIds.has(event.id)) {
+                return;
+            }
+
             const noteText = String(payload.text || '').trim().slice(0, 240);
             if (!noteText) {
                 return;
@@ -178,7 +266,17 @@ const SharedWhiteboard = ({
     };
 
     const handlePointerDown = (event) => {
-        if (tool !== 'draw' || !isMember) {
+        if (!isMember) {
+            return;
+        }
+
+        if (tool === 'erase') {
+            event.preventDefault();
+            void eraseElementAtEventPoint(event);
+            return;
+        }
+
+        if (tool !== 'draw') {
             return;
         }
 
@@ -232,6 +330,10 @@ const SharedWhiteboard = ({
     };
 
     const handleBoardClick = async (event) => {
+        if (tool === 'erase' || tool === 'draw') {
+            return;
+        }
+
         if (tool !== 'text' || !isMember) {
             return;
         }
@@ -253,6 +355,23 @@ const SharedWhiteboard = ({
         if (created) {
             setNoteText('');
         }
+    };
+
+    const eraseElementAtEventPoint = async (event) => {
+        if (!isMember) {
+            return;
+        }
+
+        const point = getPointFromPointerEvent(event);
+        const targetElement = findTopmostElementAtPoint(boardElements, point);
+
+        if (!targetElement?.id) {
+            return;
+        }
+
+        await appendEvent('erase', {
+            targetEventId: targetElement.id
+        });
     };
 
     const handleClearBoard = async () => {
@@ -298,6 +417,14 @@ const SharedWhiteboard = ({
                     >
                         <StickyNote size={15} />
                         {translations.board_text}
+                    </button>
+                    <button
+                        type="button"
+                        className={`shared-whiteboard__mode ${tool === 'erase' ? 'is-active' : ''}`}
+                        onClick={() => setTool('erase')}
+                    >
+                        <Eraser size={15} />
+                        {translations.board_erase}
                     </button>
                 </div>
 
@@ -348,7 +475,7 @@ const SharedWhiteboard = ({
                 </label>
             ) : null}
 
-            <div className={`shared-whiteboard__board-wrap ${tool === 'draw' ? 'is-draw-mode' : 'is-text-mode'}`}>
+            <div className={`shared-whiteboard__board-wrap ${tool === 'draw' ? 'is-draw-mode' : tool === 'erase' ? 'is-erase-mode' : 'is-text-mode'}`}>
                 <div className="shared-whiteboard__board">
                     <svg
                         viewBox={`0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`}
@@ -453,7 +580,13 @@ const SharedWhiteboard = ({
             </div>
 
             <div className="shared-whiteboard__footer">
-                <span>{tool === 'draw' ? translations.board_draw_hint : translations.board_place_text_hint}</span>
+                <span>
+                    {tool === 'draw'
+                        ? translations.board_draw_hint
+                        : tool === 'erase'
+                            ? translations.board_erase_hint
+                            : translations.board_place_text_hint}
+                </span>
                 <span>{translations.board_member_access}</span>
             </div>
 

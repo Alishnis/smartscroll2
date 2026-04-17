@@ -1477,16 +1477,29 @@ export const saveUserSummary = async (userId, title, content, iconName = 'Book',
             ? `${content}\n\n[[smartscroll_video:${sourceVideoId}]]`
             : content;
 
-        const { error } = await supabase
+        const { data: insertedSummary, error } = await supabase
             .from('summaries')
             .insert([{
                 user_id: userId,
                 title: title,
                 content: storedContent,
                 icon_name: iconName
-            }]);
+            }])
+            .select('id')
+            .single();
 
         if (error) throw error;
+
+        await awardSmartCoins({
+            userId,
+            amount: 5,
+            reason: 'summary_saved',
+            idempotencyKey: `summary-saved-${userId}-${insertedSummary?.id || title}`,
+            metadata: {
+                title,
+                sourceVideoId
+            }
+        });
 
         const { data: profileData, error: profileError } = await supabase
             .from('profiles')

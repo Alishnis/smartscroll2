@@ -77,7 +77,7 @@ create table public.study_group_whiteboard_events (
     id uuid primary key default gen_random_uuid(),
     group_id uuid not null references public.study_groups(id) on delete cascade,
     user_id uuid not null,
-    event_type text not null check (event_type in ('path', 'text', 'clear')),
+    event_type text not null check (event_type in ('path', 'text', 'erase', 'clear')),
     payload_json jsonb not null default '{}'::jsonb,
     created_at timestamptz not null default now()
 );

@@ -10,7 +10,7 @@ const { jwt: { AccessToken } } = require('twilio');
 const VideoGrant = AccessToken.VideoGrant;
 const app = express();
 
-const PORT = Number(process.env.TWILIO_TOKEN_SERVER_PORT || 3007);
+const PORT = Number(process.env.PORT || process.env.TWILIO_TOKEN_SERVER_PORT || 3007);
 const MAX_ALLOWED_SESSION_DURATION = 60 * 60 * 4;
 const requiredEnvVars = ['TWILIO_ACCOUNT_SID', 'TWILIO_API_KEY', 'TWILIO_API_SECRET'];
 const REDDIT_TOKEN_URL = 'https://www.reddit.com/api/v1/access_token';

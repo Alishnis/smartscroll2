@@ -40,7 +40,8 @@ const connectionOptions = {
 
 const getVideoTrack = (participant) => {
   const publications = Array.from(participant.videoTracks?.values?.() || []);
-  return publications.map((publication) => publication.track).find(Boolean) || null;
+  const tracks = publications.map((publication) => publication.track).filter(Boolean);
+  return tracks.find((track) => track.name === 'screen-share') || tracks[0] || null;
 };
 
 const getAudioTrack = (participant) => {
@@ -48,13 +49,18 @@ const getAudioTrack = (participant) => {
   return publications.map((publication) => publication.track).find(Boolean) || null;
 };
 
-const buildParticipantModel = (participant, isLocal = false) => ({
-  sid: participant.sid,
-  identity: participant.identity || (isLocal ? 'You' : 'Guest'),
-  isLocal,
-  videoTrack: getVideoTrack(participant),
-  audioTrack: getAudioTrack(participant),
-});
+const buildParticipantModel = (participant, isLocal = false) => {
+  const videoTrack = getVideoTrack(participant);
+
+  return {
+    sid: participant.sid,
+    identity: participant.identity || (isLocal ? 'You' : 'Guest'),
+    isLocal,
+    videoTrack,
+    audioTrack: getAudioTrack(participant),
+    isScreenSharing: videoTrack?.name === 'screen-share',
+  };
+};
 
 const ParticipantTile = ({ participant, highlight = false }) => {
   const videoRef = useRef(null);
@@ -104,7 +110,13 @@ const ParticipantTile = ({ participant, highlight = false }) => {
       <div className="conference-tile__meta">
         <div>
           <strong>{participant.identity}</strong>
-          <span>{participant.isLocal ? 'Local participant' : 'Live in room'}</span>
+          <span>
+            {participant.isScreenSharing
+              ? 'Sharing screen'
+              : participant.isLocal
+                ? 'Local participant'
+                : 'Live in room'}
+          </span>
         </div>
         <div className="conference-tile__badges">
           <span className={participant.audioTrack?.isEnabled === false ? 'is-off' : ''}>

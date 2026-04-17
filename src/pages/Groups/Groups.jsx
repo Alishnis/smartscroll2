@@ -596,7 +596,7 @@ const Groups = () => {
                                                     onClick={() => handleJoinGroup(group)}
                                                     disabled={isBusy}
                                                 >
-                                                    {isSeeded ? t.preview_group : (isBusy ? t.joining : t.join)}
+                                                    {isBusy ? t.joining : t.join}
                                                     <ArrowRight size={15} />
                                                 </button>
                                             )}

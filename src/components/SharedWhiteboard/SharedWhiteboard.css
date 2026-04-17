@@ -168,6 +168,10 @@
     cursor: crosshair;
 }
 
+.shared-whiteboard__board-wrap.is-erase-mode .shared-whiteboard__svg {
+    cursor: not-allowed;
+}
+
 .shared-whiteboard__board-wrap.is-text-mode .shared-whiteboard__svg {
     cursor: cell;
 }
